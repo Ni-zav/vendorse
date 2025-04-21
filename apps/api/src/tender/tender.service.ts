@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaClient } from '@vendorse/database';
+import { PrismaClient, Prisma } from '@vendorse/database';
 import { TenderStatus, BidStatus } from '@vendorse/shared';
 
 @Injectable()
@@ -201,13 +201,13 @@ export class TenderService {
   }) {
     const { status, search, page = 1, limit = 10 } = params;
     
-    const where = {
+    const where: Prisma.TenderWhereInput = {
       ...(status ? { status: { in: status } } : {}),
       ...(search
         ? {
             OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { description: { contains: search, mode: 'insensitive' } },
+              { title: { contains: search, mode: Prisma.QueryMode.insensitive } },
+              { description: { contains: search, mode: Prisma.QueryMode.insensitive } },
             ],
           }
         : {}),

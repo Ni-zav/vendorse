@@ -3,6 +3,7 @@ import { TenderService } from './tender.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { TenderStatus } from '@vendorse/shared';
 
 @Controller('tenders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -90,7 +91,7 @@ export class TenderController {
     @Query('limit') limit?: number,
   ) {
     return this.tenderService.listTenders({
-      status,
+      status: status?.map(s => s as TenderStatus),
       search,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,

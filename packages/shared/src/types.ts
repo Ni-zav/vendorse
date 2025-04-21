@@ -1,7 +1,7 @@
 export type UserRole = 'ADMIN' | 'VENDOR' | 'BUYER' | 'REVIEWER';
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type OrgType = 'BUSINESS' | 'GOVERNMENT' | 'NON_PROFIT';
-export type TenderStatus = 'DRAFT' | 'PUBLISHED' | 'UNDER_REVIEW' | 'AWARDED' | 'CLOSED';
+export type TenderStatus = 'DRAFT' | 'PUBLISHED' | 'UNDER_REVIEW' | 'AWARDED' | 'CANCELLED' | 'COMPLETED';
 export type BidStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED';
 export type NotificationType = 'TENDER_PUBLISHED' | 'BID_SUBMITTED' | 'BID_EVALUATED' | 'TENDER_AWARDED' | 'SYSTEM_NOTIFICATION';
 

@@ -1,4 +1,16 @@
-$schema: "https://json.schemastore.org/pnpm-workspace"
+$schema: https://json.schemastore.org/pnpm-workspace
+
 packages:
-  - 'apps/*'
-  - 'packages/*'
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@swc/core'
+  - bcrypt
+  - esbuild
+  - prisma
+  - sharp
+  - unrs-resolver
