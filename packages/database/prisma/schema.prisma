@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          UserRole
+  organization  Organization @relation(fields: [orgId], references: [id])
+  orgId         String
+  status        UserStatus   @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  bidsCreated   Bid[]        @relation("BidCreator")
+  bidsReviewed  EvaluationScore[] @relation("BidReviewer")
+  tendersCreated Tender[]     @relation("TenderCreator")
+  notifications Notification[]
+  auditLogs     AuditLog[]    @relation("AuditActor")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Organization {
+  id          String    @id @default(cuid())
+  name        String
+  type        OrgType
+  address     String
+  verified    Boolean   @default(false)
+  users       User[]
+  bids        Bid[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("organizations")
+}
+
+model Tender {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @db.Text
+  budget      Float
+  deadline    DateTime
+  createdBy   User      @relation("TenderCreator", fields: [createdById], references: [id])
+  createdById String
+  status      TenderStatus
+  documents   TenderDocument[]
+  bids        Bid[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@map("tenders")
+}
+
+model TenderDocument {
+  id          String    @id @default(cuid())
+  tender      Tender    @relation(fields: [tenderId], references: [id])
+  tenderId    String
+  filePath    String
+  fileType    String
+  uploadedAt  DateTime  @default(now())
+
+  @@map("tender_documents")
+}
+
+model Bid {
+  id          String    @id @default(cuid())
+  tender      Tender    @relation(fields: [tenderId], references: [id])
+  tenderId    String
+  submittedBy User      @relation("BidCreator", fields: [submittedById], references: [id])
+  submittedById String
+  organization Organization @relation(fields: [orgId], references: [id])
+  orgId       String
+  status      BidStatus
+  documents   BidDocument[]
+  evaluations EvaluationScore[]
+  submittedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@map("bids")
+}
+
+model BidDocument {
+  id          String    @id @default(cuid())
+  bid         Bid       @relation(fields: [bidId], references: [id])
+  bidId       String
+  filePath    String
+  signatureHash String
+  uploadedAt  DateTime  @default(now())
+
+  @@map("bid_documents")
+}
+
+model EvaluationScore {
+  id          String    @id @default(cuid())
+  bid         Bid       @relation(fields: [bidId], references: [id])
+  bidId       String
+  reviewer    User      @relation("BidReviewer", fields: [reviewerId], references: [id])
+  reviewerId  String
+  criteria    String
+  score       Float
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("evaluation_scores")
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  type        NotificationType
+  message     String
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  actor       User      @relation("AuditActor", fields: [actorId], references: [id])
+  actorId     String
+  actionType  String
+  targetId    String
+  targetType  String
+  ipAddress   String
+  timestamp   DateTime  @default(now())
+
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+enum UserRole {
+  ADMIN
+  VENDOR
+  BUYER
+  REVIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum OrgType {
+  GOVERNMENT
+  BUSINESS
+  NON_PROFIT
+}
+
+enum TenderStatus {
+  DRAFT
+  PUBLISHED
+  UNDER_REVIEW
+  AWARDED
+  CANCELLED
+  COMPLETED
+}
+
+enum BidStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum NotificationType {
+  TENDER_PUBLISHED
+  BID_SUBMITTED
+  BID_EVALUATED
+  TENDER_AWARDED
+  SYSTEM_NOTIFICATION
+}
