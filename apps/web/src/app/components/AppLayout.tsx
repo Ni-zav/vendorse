@@ -41,7 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="flex h-16 justify-between">
                 <div className="flex">
                   <div className="flex flex-shrink-0 items-center">
-                    <Link href="/dashboard">
+                    <Link href={user ? "/dashboard" : "/"}>
                       <span className="text-2xl font-bold text-blue-600">Vendorse</span>
                     </Link>
                   </div>
