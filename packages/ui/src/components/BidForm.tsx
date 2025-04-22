@@ -69,7 +69,7 @@ export function BidForm({ onSubmit, isLoading }: BidFormProps) {
             id="price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
             placeholder="Enter your bid amount"
           />
           {errors.price && (
@@ -88,7 +88,7 @@ export function BidForm({ onSubmit, isLoading }: BidFormProps) {
             id="deliveryTime"
             value={deliveryTimeInDays}
             onChange={(e) => setDeliveryTimeInDays(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
             placeholder="Enter estimated delivery time"
           />
           {errors.deliveryTimeInDays && (
@@ -107,7 +107,7 @@ export function BidForm({ onSubmit, isLoading }: BidFormProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
             placeholder="Describe your proposal"
           />
           {errors.description && (

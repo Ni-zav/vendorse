@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaClient } from '@vendorse/database';
+import { OrgType } from '@vendorse/shared';
 import { compare, hash } from 'bcrypt';
 
 @Injectable()
@@ -70,5 +71,15 @@ export class AuthService {
     });
 
     return this.login(user);
+  }
+
+  async createOrganization(name: string, type: OrgType, address: string) {
+    return this.prisma.organization.create({
+      data: {
+        name,
+        type,
+        address,
+      },
+    });
   }
 }

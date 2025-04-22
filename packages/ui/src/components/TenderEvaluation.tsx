@@ -116,6 +116,7 @@ export function TenderEvaluation({
                     [criterion.id]: Number(e.target.value),
                   })
                 }
+                className="text-gray-800 bg-white"
                 error={errors[criterion.id]}
               />
             </div>
@@ -139,6 +140,7 @@ export function TenderEvaluation({
           placeholder="Provide detailed comments supporting your evaluation"
           value={comments}
           onChange={(e) => setComments(e.target.value)}
+          className="text-gray-800 bg-white"
           error={errors.comments}
         />
       </FormField>

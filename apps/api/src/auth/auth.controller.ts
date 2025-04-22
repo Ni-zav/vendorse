@@ -1,6 +1,7 @@
-import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OrgType } from '@vendorse/shared';
 
 @Controller('auth')
 export class AuthController {
@@ -8,6 +9,9 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() loginDto: { email: string; password: string }) {
+    if (!loginDto?.email || !loginDto?.password) {
+      throw new BadRequestException('Email and password are required');
+    }
     const user = await this.authService.validateUser(loginDto.email, loginDto.password);
     return this.authService.login(user);
   }
@@ -16,19 +20,49 @@ export class AuthController {
   async register(
     @Body()
     registerDto: {
-      email: string;
-      password: string;
-      name: string;
-      orgId: string;
-      role: string;
+      organization: {
+        name: string;
+        type: OrgType;
+        address: string;
+      };
+      user: {
+        name: string;
+        email: string;
+        password: string;
+        role: string;
+      };
     },
   ) {
+    if (!registerDto?.organization || !registerDto?.user) {
+      throw new BadRequestException('Missing organization or user data');
+    }
+
+    const { organization, user } = registerDto;
+
+    if (!organization.name || !organization.type || !organization.address) {
+      throw new BadRequestException('Missing required organization fields');
+    }
+
+    if (!['BUSINESS', 'GOVERNMENT', 'NON_PROFIT'].includes(organization.type)) {
+      throw new BadRequestException('Invalid organization type');
+    }
+
+    if (!user.email || !user.password || !user.name) {
+      throw new BadRequestException('Missing required user fields');
+    }
+
+    const org = await this.authService.createOrganization(
+      organization.name,
+      organization.type,
+      organization.address
+    );
+
     return this.authService.register(
-      registerDto.email,
-      registerDto.password,
-      registerDto.name,
-      registerDto.orgId,
-      registerDto.role,
+      user.email,
+      user.password,
+      user.name,
+      org.id,
+      user.role
     );
   }
 

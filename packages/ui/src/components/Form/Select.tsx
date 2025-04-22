@@ -32,17 +32,17 @@ export function Select({
       value={value}
       onChange={(e) => onChange?.(e.target.value)}
       required={required}
-      className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
-        error ? 'border-red-300' : ''
+      className={`block w-full rounded-md shadow-sm text-gray-800 bg-white focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
+        error ? 'border-red-300' : 'border-gray-300'
       } ${className}`}
     >
       {placeholder && (
-        <option value="" disabled>
+        <option value="" disabled className="text-gray-500">
           {placeholder}
         </option>
       )}
       {options.map((option) => (
-        <option key={option.value} value={option.value}>
+        <option key={option.value} value={option.value} className="text-gray-800">
           {option.label}
         </option>
       ))}

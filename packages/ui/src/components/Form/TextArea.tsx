@@ -11,7 +11,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     return (
       <textarea
         ref={ref}
-        className={`block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
+        className={`block w-full rounded-md shadow-sm text-gray-800 bg-white focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${
           error ? 'border-red-300' : 'border-gray-300'
         } ${className}`}
         {...props}

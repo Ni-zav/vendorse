@@ -147,6 +147,9 @@ importers:
       '@heroicons/react':
         specifier: ^2.2.0
         version: 2.2.0(react@19.1.0)
+      '@vendorse/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@vendorse/ui':
         specifier: workspace:*
         version: link:../../packages/ui

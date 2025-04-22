@@ -4,44 +4,24 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { Button, BidForm, TenderEvaluation } from '@vendorse/ui';
-import { formatCurrency, formatDate } from '@vendorse/shared';
+import { 
+  formatCurrency, 
+  formatDate, 
+  type Tender, 
+  type Bid, 
+  type Document, 
+  type Evaluation 
+} from '@vendorse/shared';
 
-interface TenderDetail {
-  id: string;
-  title: string;
-  description: string;
-  budget: number;
-  deadline: string;
-  status: string;
-  createdBy: {
-    name: string;
-    organization: {
-      name: string;
-    };
-  };
-  documents: Array<{
-    id: string;
-    filePath: string;
-    fileType: string;
-  }>;
-  bids: Array<{
-    id: string;
-    status: string;
-    submittedBy: {
-      name: string;
-      organization: {
-        name: string;
-      };
-    };
-    documents: Array<{
-      id: string;
-      filePath: string;
-    }>;
-    evaluations: Array<{
-      id: string;
-      score: number;
-      criteria: string;
-      notes: string;
+// Convert dates to string format for the API response
+type StringDates<T> = {
+  [K in keyof T]: T[K] extends Date ? string : T[K];
+};
+
+interface TenderDetail extends StringDates<Omit<Tender, 'bids'>> {
+  bids: Array<StringDates<Omit<Bid, 'documents' | 'evaluations'>> & {
+    documents: Array<Pick<Document, 'id' | 'filePath'>>;
+    evaluations: Array<Pick<Evaluation, 'id' | 'score' | 'criteria' | 'notes'> & {
       reviewer: {
         name: string;
       };
@@ -49,7 +29,11 @@ interface TenderDetail {
   }>;
 }
 
-export default function TenderDetailPage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: { id: string };
+}
+
+export default function TenderDetailPage({ params }: PageProps) {
   const { user } = useAuth();
   const [tender, setTender] = useState<TenderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -274,7 +258,7 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
           {user && user.role === 'VENDOR' && tender.status === 'PUBLISHED' && (
             <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
               <h4 className="text-lg font-medium text-gray-900 mb-4">Submit Your Bid</h4>
-              <BidForm onSubmit={handleSubmitBid} isSubmitting={isSubmitting} />
+              <BidForm onSubmit={handleSubmitBid} isLoading={isSubmitting} />
             </div>
           )}
 
@@ -287,10 +271,11 @@ export default function TenderDetailPage({ params }: { params: { id: string } })
                     Evaluate Bid from {bid.submittedBy.organization.name}
                   </h4>
                   <TenderEvaluation
+                    bidId={bid.id}
                     criteria={[
-                      { id: '1', name: 'Technical Capability', description: 'Evaluate technical approach and methodology', weight: 40, maxScore: 100 },
-                      { id: '2', name: 'Price', description: 'Evaluate proposed budget and cost-effectiveness', weight: 30, maxScore: 100 },
-                      { id: '3', name: 'Timeline', description: 'Evaluate proposed timeline and delivery schedule', weight: 30, maxScore: 100 },
+                      { id: '1', name: 'Technical Capability', description: 'Evaluate technical approach and methodology', weight: 40 },
+                      { id: '2', name: 'Price', description: 'Evaluate proposed budget and cost-effectiveness', weight: 30 },
+                      { id: '3', name: 'Timeline', description: 'Evaluate proposed timeline and delivery schedule', weight: 30 },
                     ]}
                     onSubmit={(scores) => handleSubmitEvaluation(bid.id, scores)}
                     isSubmitting={isSubmitting}

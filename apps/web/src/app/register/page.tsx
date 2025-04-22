@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, FormField, Input, Select } from '@vendorse/ui';
-import { OrgType } from '@vendorse/shared';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,25 +11,75 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log('Form - Submit started');
     setIsSubmitting(true);
     setError('');
 
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      organization: {
-        name: formData.get('orgName'),
-        type: formData.get('orgType'),
-        address: formData.get('address'),
-      },
-      user: {
-        name: formData.get('name'),
-        email: formData.get('email'),
-        password: formData.get('password'),
-        role: 'VENDOR', // Default role for self-registration
-      },
-    };
-
     try {
+      const formData = new FormData(e.currentTarget);
+      
+      // Debug: Log raw form data
+      console.log('Form - Raw form data:');
+      const formDataObj: Record<string, string> = {};
+      for (const [key, value] of formData.entries()) {
+        formDataObj[key] = value.toString();
+        console.log(`${key}: ${value}`);
+      }
+      
+      // Get and validate organization data
+      const orgName = formData.get('orgName')?.toString();
+      const orgType = formData.get('orgType')?.toString();
+      const address = formData.get('address')?.toString();
+      
+      console.log('Form - Organization data:', { orgName, orgType, address });
+      
+      if (!orgName || !orgType || !address) {
+        console.log('Form - Missing organization fields:', { orgName, orgType, address });
+        setError('All organization fields are required');
+        return;
+      }
+
+      // Get and validate user data
+      const name = formData.get('name')?.toString();
+      const email = formData.get('email')?.toString();
+      const password = formData.get('password')?.toString();
+      
+      console.log('Form - User data validation:', { 
+        name: name ? 'provided' : 'missing',
+        email: email ? 'provided' : 'missing',
+        password: password ? 'provided' : 'missing'
+      });
+      
+      if (!name || !email || !password) {
+        console.log('Form - Missing user fields:', {
+          name: !name,
+          email: !email,
+          password: !password
+        });
+        setError('All user fields are required');
+        return;
+      }
+
+      const data = {
+        organization: {
+          name: orgName,
+          type: orgType as 'BUSINESS' | 'GOVERNMENT' | 'NON_PROFIT',
+          address,
+        },
+        user: {
+          name,
+          email,
+          password,
+          role: 'VENDOR',
+        },
+      };
+
+      console.log('Form - Sending registration data:', {
+        organization: data.organization,
+        user: { ...data.user, password: '[REDACTED]' }
+      });
+
+      console.log('Form - Sending request to:', '/api/auth/register');
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -39,17 +88,29 @@ export default function RegisterPage() {
         body: JSON.stringify(data),
       });
 
+      const result = await response.json();
+      console.log('Form - Response:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        data: result
+      });
+
       if (!response.ok) {
-        throw new Error('Registration failed');
+        throw new Error(result.message || result.error || 'Registration failed');
       }
 
-      const result = await response.json();
       localStorage.setItem('token', result.accessToken);
       router.push('/dashboard');
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      console.error('Form - Registration error:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error'
+      });
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
+      console.log('Form - Submit completed');
     }
   };
 

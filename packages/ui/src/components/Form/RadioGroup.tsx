@@ -26,13 +26,13 @@ export function RadioGroup({
             value={option.value}
             checked={value === option.value}
             onChange={(e) => onChange(e.target.value)}
-            className={`h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 ${
+            className={`h-4 w-4 border-gray-300 text-blue-600 bg-white focus:ring-blue-500 ${
               error ? 'border-red-300' : ''
             }`}
           />
           <label
             htmlFor={`${name}-${option.value}`}
-            className="ml-3 block text-sm font-medium text-gray-700"
+            className="ml-3 block text-sm font-medium text-gray-800"
           >
             {option.label}
           </label>
