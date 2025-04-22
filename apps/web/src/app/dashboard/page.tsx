@@ -75,6 +75,23 @@ export default function DashboardPage() {
 
     switch (user.role) {
       case 'ADMIN':
+        return (
+          <div className="flex space-x-4">
+            <Button onClick={() => router.push('/users')}>
+              Manage Users
+            </Button>
+            <Button onClick={() => router.push('/tenders/new')}>
+              Create New Tender
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/tenders')}
+            >
+              View All Tenders
+            </Button>
+          </div>
+        );
+      
       case 'BUYER':
         return (
           <div className="flex space-x-4">
