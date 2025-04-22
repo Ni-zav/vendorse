@@ -2,11 +2,12 @@ import { NextRequest } from 'next/server';
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const { id } = context.params;
+    const params = await context.params;
+    const { id } = params;
     
     const response = await fetch(`${apiUrl}/users/${id}`, {
       headers: {
@@ -34,11 +35,12 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const { id } = context.params;
+    const params = await context.params;
+    const { id } = params;
     const body = await req.json();
     
     const response = await fetch(`${apiUrl}/users/${id}`, {

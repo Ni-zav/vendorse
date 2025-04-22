@@ -4,24 +4,34 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> }
 ) {
-  const apiUrl = process.env.API_URL || 'http://localhost:3003';
-  const params = await context.params;
-  
-  if (!params?.path) {
-    return Response.json({ error: 'Invalid path' }, { status: 400 });
+  try {
+    const apiUrl = process.env.API_URL || 'http://localhost:3003';
+    const params = await context.params;
+    
+    if (!params?.path) {
+      return Response.json({ error: 'Invalid path' }, { status: 400 });
+    }
+
+    const path = Array.isArray(params.path) ? params.path.join('/') : params.path;
+    
+    const response = await fetch(`${apiUrl}/auth/${path}`, {
+      headers: {
+        ...Object.fromEntries(req.headers),
+        'host': 'localhost:3003',
+      },
+    });
+
+    const data = await response.json();
+    return Response.json(data, { status: response.status });
+  } catch (error) {
+    console.error('API Route - Request failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return Response.json(
+      { error: 'Failed to connect to authentication service' },
+      { status: 500 }
+    );
   }
-
-  const path = Array.isArray(params.path) ? params.path.join('/') : params.path;
-  
-  const response = await fetch(`${apiUrl}/auth/${path}`, {
-    headers: {
-      ...Object.fromEntries(req.headers),
-      'host': 'localhost:3003',
-    },
-  });
-
-  const data = await response.json();
-  return Response.json(data, { status: response.status });
 }
 
 export async function POST(
@@ -33,6 +43,10 @@ export async function POST(
     const params = await context.params;
     const body = await req.json();
     
+    if (!params?.path) {
+      return Response.json({ error: 'Invalid path' }, { status: 400 });
+    }
+
     console.log('API Route - Incoming request:', {
       path: params.path,
       method: req.method,
