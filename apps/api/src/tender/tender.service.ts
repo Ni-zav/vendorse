@@ -42,6 +42,39 @@ export class TenderService {
     return this.prisma.tender.update({
       where: { id: tenderId },
       data: { status: 'PUBLISHED' },
+      include: {
+        documents: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            organization: true,
+          },
+        },
+        bids: {
+          include: {
+            submittedBy: {
+              select: {
+                id: true,
+                name: true,
+                organization: true,
+              },
+            },
+            documents: true,
+            evaluations: {
+              include: {
+                reviewer: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -66,15 +99,18 @@ export class TenderService {
           submittedById: data.submittedById,
           orgId: data.orgId,
           status: 'SUBMITTED',
+          submittedAt: new Date(),
         },
       });
 
-      await tx.bidDocument.createMany({
-        data: data.documents.map((doc) => ({
-          bidId: bid.id,
-          ...doc,
-        })),
-      });
+      if (data.documents?.length > 0) {
+        await tx.bidDocument.createMany({
+          data: data.documents.map((doc) => ({
+            bidId: bid.id,
+            ...doc,
+          })),
+        });
+      }
 
       return bid;
     });
@@ -154,8 +190,8 @@ export class TenderService {
     });
   }
 
-  async getTenderById(tenderId: string) {
-    return this.prisma.tender.findUnique({
+  async getTenderById(tenderId: string, userRole?: string) {
+    const tender = await this.prisma.tender.findUnique({
       where: { id: tenderId },
       include: {
         documents: true,
@@ -191,6 +227,50 @@ export class TenderService {
         },
       },
     });
+
+    if (!tender) {
+      throw new NotFoundException('Tender not found');
+    }
+
+    // Role-based visibility rules
+    if (userRole === 'VENDOR' && tender.status === 'DRAFT') {
+      throw new ForbiddenException('This tender is not yet published');
+    }
+
+    if (userRole === 'REVIEWER' && !['PUBLISHED', 'UNDER_REVIEW'].includes(tender.status)) {
+      throw new ForbiddenException('This tender is not available for review');
+    }
+
+    return tender;
+  }
+
+  async getUserBids(userId: string) {
+    const bids = await this.prisma.bid.findMany({
+      where: { submittedById: userId },
+      include: {
+        tender: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            budget: true,
+            deadline: true,
+            status: true
+          }
+        },
+        evaluations: {
+          include: {
+            reviewer: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { submittedAt: 'desc' }
+    });
+    return bids;
   }
 
   async listTenders(params: {
@@ -198,11 +278,13 @@ export class TenderService {
     search?: string;
     page?: number;
     limit?: number;
+    role?: string;
   }) {
-    const { status, search, page = 1, limit = 10 } = params;
+    const { status, search, page = 1, limit = 10, role } = params;
     
     const where: Prisma.TenderWhereInput = {
       ...(status ? { status: { in: status } } : {}),
+      ...(role === 'VENDOR' ? { status: 'PUBLISHED' } : {}),
       ...(search
         ? {
             OR: [

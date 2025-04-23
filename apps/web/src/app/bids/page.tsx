@@ -34,20 +34,32 @@ export default function BidsPage() {
   const { user } = useAuth();
   const [bids, setBids] = useState<Bid[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBids = async () => {
       try {
+        setError(null);
         const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
         const response = await fetch('/api/bids', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch bids');
+        }
+
         const data = await response.json();
-        setBids(data);
+        setBids(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching bids:', error);
+        setError(error instanceof Error ? error.message : 'An error occurred while fetching bids');
       } finally {
         setIsLoading(false);
       }

@@ -32,14 +32,22 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
           },
         });
 
-        // Check if response is ok before trying to parse JSON
         if (!response.ok) {
           const errorText = await response.text();
           let errorMessage;
           try {
             const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error;
-          } catch {
+            errorMessage = errorData.message || errorData.error;
+            
+            // Handle specific error cases
+            if (response.status === 403) {
+              if (errorMessage.includes('not yet published')) {
+                throw new Error('This tender is in draft status and not yet available for viewing');
+              } else if (errorMessage.includes('not available for review')) {
+                throw new Error('This tender is not currently available for review');
+              }
+            }
+          } catch (parseError) {
             errorMessage = errorText || 'Failed to fetch tender details';
           }
           throw new Error(errorMessage);
@@ -67,7 +75,10 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
   const handlePublishTender = async () => {
     try {
       setIsSubmitting(true);
+      setError('');
       const token = localStorage.getItem('token');
+      
+      console.log('Starting publish tender request:', { tenderId: id });
       const response = await fetch(`/api/tenders/${id}/publish`, {
         method: 'PUT',
         headers: {
@@ -75,14 +86,32 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
         },
       });
 
+      const contentType = response.headers.get('content-type');
+      let errorMessage = 'Failed to publish tender';
+      
       if (!response.ok) {
-        throw new Error('Failed to publish tender');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        console.error('Publish tender failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage
+        });
+        throw new Error(errorMessage);
       }
 
       const updatedTender = await response.json();
+      console.log('Tender published successfully:', updatedTender);
       setTender(updatedTender);
     } catch (err) {
-      setError('Failed to publish tender');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to publish tender';
+      console.error('Publish tender error:', err);
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -240,7 +269,7 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
           </div>
 
           {/* Action buttons based on user role and tender status */}
-          {user && user.role === 'BUYER' && tender.status === 'DRAFT' && (
+          {user && (user.role === 'BUYER' || user.role === 'ADMIN') && tender.status === 'DRAFT' && (
             <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
               <Button
                 onClick={handlePublishTender}

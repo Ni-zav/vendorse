@@ -15,6 +15,7 @@ interface TenderCardProps {
     };
   };
   bids?: Array<any>;
+  bidCount?: number;
   onClick?: () => void;
   className?: string;
 }
@@ -26,7 +27,7 @@ export function TenderCard({
   deadline,
   status,
   createdBy,
-  bids,
+  bidCount,
   onClick,
   className = '',
 }: TenderCardProps) {
@@ -81,10 +82,10 @@ export function TenderCard({
             <dt className="text-sm font-medium text-gray-500">Posted by</dt>
             <dd className="text-sm text-gray-900">{createdBy.organization.name}</dd>
           </div>
-          {bids && (
+          {typeof bidCount === 'number' && (
             <div className="flex justify-between">
               <dt className="text-sm font-medium text-gray-500">Bids</dt>
-              <dd className="text-sm text-gray-900">{bids.length}</dd>
+              <dd className="text-sm text-gray-900">{bidCount}</dd>
             </div>
           )}
         </dl>

@@ -1,13 +1,11 @@
 import { NextRequest } from 'next/server';
 
-export async function POST(
+export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const params = context.params;
-    const body = await req.json();
     const authHeader = req.headers.get('authorization');
     
     if (!authHeader) {
@@ -17,14 +15,12 @@ export async function POST(
       );
     }
 
-    const response = await fetch(`${apiUrl}/tenders/${params.id}/bids`, {
-      method: 'POST',
+    const response = await fetch(`${apiUrl}/tenders/bids`, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
         'host': 'localhost:3003'
-      },
-      body: JSON.stringify(body)
+      }
     });
 
     const data = await response.json();
@@ -33,12 +29,12 @@ export async function POST(
       statusText: response.statusText
     });
   } catch (error) {
-    console.error('API Route - Submit bid failed:', {
+    console.error('API Route - Fetch bids failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     
     return Response.json(
-      { error: 'Failed to submit bid' },
+      { error: 'Failed to fetch bids' },
       { status: 500 }
     );
   }

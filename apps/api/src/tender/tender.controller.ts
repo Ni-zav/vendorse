@@ -13,13 +13,13 @@ export class TenderController {
   @Post()
   @Roles('ADMIN', 'BUYER')
   async createTender(
+    @Request() req,
     @Body() createTenderDto: {
       title: string;
       description: string;
       budget: number;
       deadline: Date;
-    },
-    @Request() req,
+    }
   ) {
     return this.tenderService.createTender({
       ...createTenderDto,
@@ -29,18 +29,39 @@ export class TenderController {
 
   @Put(':id/publish')
   @Roles('ADMIN', 'BUYER')
-  async publishTender(@Param('id') id: string, @Request() req) {
-    return this.tenderService.publishTender(id, req.user.id);
+  async publishTender(@Request() req, @Param('id') id: string) {
+    try {
+      console.log('Backend - Publishing tender:', {
+        tenderId: id,
+        userId: req.user.id,
+        userRole: req.user.role
+      });
+      
+      const result = await this.tenderService.publishTender(id, req.user.id);
+      console.log('Backend - Tender published successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Backend - Publish tender failed:', {
+        tenderId: id,
+        userId: req.user.id,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
+      throw error;
+    }
   }
 
   @Post(':id/bids')
   @Roles('VENDOR')
   async submitBid(
+    @Request() req,
     @Param('id') tenderId: string,
     @Body() submitBidDto: {
       documents: Array<{ filePath: string; signatureHash: string }>;
-    },
-    @Request() req,
+    }
   ) {
     return this.tenderService.submitBid({
       tenderId,
@@ -53,13 +74,13 @@ export class TenderController {
   @Post('bids/:id/evaluate')
   @Roles('REVIEWER')
   async evaluateBid(
+    @Request() req,
     @Param('id') bidId: string,
     @Body() evaluationDto: {
       criteria: string;
       score: number;
       notes?: string;
-    },
-    @Request() req,
+    }
   ) {
     return this.tenderService.evaluateBid({
       bidId,
@@ -71,30 +92,39 @@ export class TenderController {
   @Put(':id/award/:bidId')
   @Roles('ADMIN', 'BUYER')
   async awardTender(
-    @Param('id') tenderId: string,
-    @Param('bidId') bidId: string,
     @Request() req,
+    @Param('id') tenderId: string,
+    @Param('bidId') bidId: string
   ) {
     return this.tenderService.awardTender(tenderId, bidId, req.user.id);
   }
 
   @Get(':id')
-  async getTender(@Param('id') id: string) {
-    return this.tenderService.getTenderById(id);
+  async getTender(@Request() req, @Param('id') id: string) {
+    return this.tenderService.getTenderById(id, req.user.role);
   }
 
   @Get()
   async listTenders(
+    @Request() req,
     @Query('status') status?: string[],
     @Query('search') search?: string,
     @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('limit') limit?: number
   ) {
     return this.tenderService.listTenders({
       status: status?.map(s => s as TenderStatus),
       search,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      role: req.user.role,
     });
+  }
+
+  @Get('bids')
+  @Roles('VENDOR')
+  async getUserBids(@Request() req) {
+    const { id: userId } = req.user;
+    return this.tenderService.getUserBids(userId);
   }
 }
