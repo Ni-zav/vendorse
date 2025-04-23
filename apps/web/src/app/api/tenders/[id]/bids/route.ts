@@ -21,8 +21,7 @@ export async function POST(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
-        'host': 'localhost:3003'
+        'Authorization': authHeader
       },
       body: JSON.stringify(body)
     });

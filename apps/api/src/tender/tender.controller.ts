@@ -121,9 +121,9 @@ export class TenderController {
     });
   }
 
-  @Get('bids')
+  @Get('bids/vendor')
   @Roles('VENDOR')
-  async getUserBids(@Request() req) {
+  async getVendorBids(@Request() req) {
     const { id: userId } = req.user;
     return this.tenderService.getUserBids(userId);
   }

@@ -1,24 +1,17 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+'use client';
+
 import "./globals.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import AppLayout from "./components/AppLayout";
 
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "Vendorse - Tender Management System",
-  description: "Secure and efficient tender management platform",
-};
-
-export default function RootLayout({
+export default function ClientLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <AppLayout>
             {children}
