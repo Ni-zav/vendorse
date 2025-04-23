@@ -307,7 +307,14 @@ export default function DashboardPage() {
             {tenders.map((tender) => (
               <TenderCard
                 key={tender.id}
-                {...tender}
+                id={tender.id}
+                title={tender.title}
+                description={tender.description}
+                budget={tender.budget}
+                deadline={tender.deadline}
+                status={tender.status}
+                createdBy={tender.createdBy}
+                bidCount={tender._count?.bids || 0} // Pass bid count to TenderCard
                 onClick={() => router.push(`/tenders/${tender.id}`)}
               />
             ))}
