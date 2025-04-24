@@ -121,26 +121,122 @@ export class TenderService {
     reviewerId: string;
     criteria: string;
     score: number;
-    notes?: string;
+    notes?: string | null;
+    recommendation?: string | null;
+    ipAddress: string;
   }) {
-    const bid = await this.prisma.bid.findUnique({
-      where: { id: data.bidId },
-      include: { tender: true },
-    });
-
-    if (!bid || bid.status !== 'SUBMITTED') {
-      throw new NotFoundException('Bid not found or not available for evaluation');
-    }
-
-    return this.prisma.evaluationScore.create({
-      data: {
+    try {
+      console.log('TenderService.evaluateBid - Starting evaluation:', {
         bidId: data.bidId,
         reviewerId: data.reviewerId,
-        criteria: data.criteria,
+        criteria: data.criteria
+      });
+
+      const bid = await this.prisma.bid.findUnique({
+        where: { id: data.bidId },
+        include: { 
+          tender: true,
+          submittedBy: true,
+          evaluations: {
+            where: {
+              reviewerId: data.reviewerId,
+              criteria: data.criteria
+            }
+          }
+        },
+      });
+
+      if (!bid) {
+        throw new NotFoundException('Bid not found');
+      }
+
+      if (bid.status !== 'SUBMITTED') {
+        throw new ForbiddenException('Bid is not available for evaluation');
+      }
+
+      const evaluationData = {
         score: data.score,
-        notes: data.notes,
-      },
-    });
+        notes: data.notes ?? null,
+        recommendation: data.recommendation ?? null
+      };
+
+      let evaluation;
+      if (bid.evaluations.length > 0) {
+        // Update existing evaluation
+        evaluation = await this.prisma.evaluationScore.update({
+          where: { id: bid.evaluations[0].id },
+          data: evaluationData
+        });
+
+        console.log('TenderService.evaluateBid - Updated existing evaluation:', evaluation);
+      } else {
+        // Create new evaluation in a transaction with notification and audit log
+        const result = await this.prisma.$transaction(async (tx) => {
+          // Create evaluation
+          const newEvaluation = await tx.evaluationScore.create({
+            data: {
+              bidId: data.bidId,
+              reviewerId: data.reviewerId,
+              criteria: data.criteria,
+              ...evaluationData
+            },
+          });
+
+          // Create notification for bid submitter
+          await tx.notification.create({
+            data: {
+              userId: bid.submittedBy.id,
+              type: 'BID_EVALUATED',
+              message: `Your bid for tender "${bid.tender.title}" has received a new evaluation.`
+            }
+          });
+
+          // Create audit log entry
+          await tx.auditLog.create({
+            data: {
+              actorId: data.reviewerId,
+              actionType: 'BID_EVALUATED',
+              targetId: data.bidId,
+              targetType: 'BID',
+              ipAddress: data.ipAddress
+            }
+          });
+
+          // Update bid status if needed
+          if (bid.status === 'SUBMITTED') {
+            await tx.bid.update({
+              where: { id: bid.id },
+              data: { status: 'UNDER_REVIEW' }
+            });
+          }
+
+          // Update tender status if needed
+          if (bid.tender.status !== 'UNDER_REVIEW') {
+            await tx.tender.update({
+              where: { id: bid.tender.id },
+              data: { status: 'UNDER_REVIEW' }
+            });
+          }
+
+          return newEvaluation;
+        });
+
+        evaluation = result;
+        console.log('TenderService.evaluateBid - Created new evaluation:', evaluation);
+      }
+
+      return evaluation;
+    } catch (error) {
+      console.error('TenderService.evaluateBid - Error:', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        data
+      });
+      throw error;
+    }
   }
 
   async awardTender(tenderId: string, bidId: string, userId: string) {
@@ -204,6 +300,7 @@ export class TenderService {
           },
         },
         bids: {
+          where: userRole === 'REVIEWER' ? { status: 'SUBMITTED' } : undefined,
           include: {
             submittedBy: {
               select: {
@@ -279,50 +376,123 @@ export class TenderService {
     page?: number;
     limit?: number;
     role?: string;
+    userId?: string;
   }) {
-    const { status, search, page = 1, limit = 10, role } = params;
+    const { status, search, page = 1, limit = 10, role, userId } = params;
     
-    const where: Prisma.TenderWhereInput = {
-      ...(status ? { status: { in: status } } : {}),
-      ...(role === 'VENDOR' ? { status: 'PUBLISHED' } : {}),
-      ...(search
-        ? {
-            OR: [
-              { title: { contains: search, mode: Prisma.QueryMode.insensitive } },
-              { description: { contains: search, mode: Prisma.QueryMode.insensitive } },
-            ],
+    console.log('TenderService.listTenders - Building query:', {
+      status,
+      role,
+      search,
+      userId
+    });
+
+    // Build the base where clause
+    const where: Prisma.TenderWhereInput = {};
+
+    // Handle role-specific filters
+    if (role === 'VENDOR') {
+      where.status = 'PUBLISHED';
+    } else if (role === 'REVIEWER') {
+      // For reviewers, show tenders that have bids needing evaluation
+      where.bids = {
+        some: {
+          status: 'SUBMITTED',
+          evaluations: {
+            none: {
+              reviewerId: userId
+            }
           }
-        : {}),
-    };
+        }
+      };
+    } else if (role === 'BUYER') {
+      where.createdById = userId;
+    }
 
-    const [tenders, total] = await Promise.all([
-      this.prisma.tender.findMany({
-        where,
-        include: {
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              organization: true,
-            },
-          },
-          _count: {
-            select: { bids: true },
-          },
+    // Add search filter if provided
+    if (search) {
+      where.OR = [
+        ...(where.OR || []),
+        {
+          title: { contains: search, mode: 'insensitive' }
         },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.tender.count({ where }),
-    ]);
+        {
+          description: { contains: search, mode: 'insensitive' }
+        }
+      ];
+    }
 
-    return {
-      tenders,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    console.log('TenderService.listTenders - Final where clause:', where);
+
+    try {
+      const [tenders, total] = await Promise.all([
+        this.prisma.tender.findMany({
+          where,
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                organization: true,
+              },
+            },
+            _count: {
+              select: { 
+                bids: true
+              },
+            },
+            bids: {
+              include: {
+                submittedBy: {
+                  select: {
+                    id: true,
+                    name: true,
+                    organization: true
+                  }
+                },
+                evaluations: {
+                  include: {
+                    reviewer: {
+                      select: {
+                        id: true,
+                        name: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.tender.count({ where }),
+      ]);
+
+      console.log('TenderService.listTenders - Query results:', {
+        tenderCount: tenders.length,
+        total,
+        page,
+        hasMore: total > page * limit
+      });
+
+      return {
+        tenders,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      console.error('TenderService.listTenders - Database error:', {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
+      throw error;
+    }
   }
 }

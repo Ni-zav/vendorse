@@ -26,6 +26,7 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
           throw new Error('No authentication token found');
         }
 
+        console.log('Fetching tender details:', { id });
         const response = await fetch(`/api/tenders/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -50,10 +51,16 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
           } catch (parseError) {
             errorMessage = errorText || 'Failed to fetch tender details';
           }
+          console.error('Error response:', { status: response.status, errorMessage });
           throw new Error(errorMessage);
         }
 
         const data = await response.json();
+        console.log('Tender details received:', {
+          id: data.id,
+          status: data.status,
+          bidsCount: data.bids?.length
+        });
         setTender(data);
       } catch (err) {
         console.error('Error fetching tender details:', err);
@@ -224,156 +231,168 @@ export default function TenderDetailClient({ params }: { params: { id: string } 
     <ProtectedRoute>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
+          <div className="mb-6 rounded-md bg-red-50 p-4">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
 
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-2xl font-bold leading-6 text-gray-900">{tender.title}</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Posted by {tender.createdBy.name} from {tender.createdBy.organization.name}
-                </p>
-              </div>
-              <span className={`px-2 py-1 text-sm font-semibold rounded-full ${
-                tender.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' :
-                tender.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-                tender.status === 'AWARDED' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {tender.status}
-              </span>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-            <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <dt className="text-sm font-medium text-gray-500">Description</dt>
-                <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{tender.description}</dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Budget</dt>
-                <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tender.budget)}</dd>
-              </div>
-              
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Deadline</dt>
-                <dd className="mt-1 text-sm text-gray-900">{formatDate(new Date(tender.deadline))}</dd>
-              </div>
-            </dl>
-          </div>
-
-          {/* Action buttons based on user role and tender status */}
-          {user && (user.role === 'BUYER' || user.role === 'ADMIN') && tender.status === 'DRAFT' && (
-            <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
-              <Button
-                onClick={handlePublishTender}
-                isLoading={isSubmitting}
-              >
-                Publish Tender
-              </Button>
-            </div>
-          )}
-
-          {/* Bid submission form for vendors */}
-          {user && user.role === 'VENDOR' && tender.status === 'PUBLISHED' && (
-            <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Submit Your Bid</h4>
-              <BidForm onSubmit={handleSubmitBid} isLoading={isSubmitting} />
-            </div>
-          )}
-
-          {/* Bid evaluations for reviewers */}
-          {user && user.role === 'REVIEWER' && tender.status === 'UNDER_REVIEW' && (
-            <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
-              {tender.bids.map((bid) => (
-                <div key={bid.id} className="mb-8 last:mb-0">
-                  <h4 className="text-lg font-medium text-gray-900 mb-4">
-                    Evaluate Bid from {bid.submittedBy.organization.name}
-                  </h4>
-                  <TenderEvaluation
-                    bidId={bid.id}
-                    criteria={[
-                      { id: '1', name: 'Technical Capability', description: 'Evaluate technical approach and methodology', weight: 40 },
-                      { id: '2', name: 'Price', description: 'Evaluate proposed budget and cost-effectiveness', weight: 30 },
-                      { id: '3', name: 'Timeline', description: 'Evaluate proposed timeline and delivery schedule', weight: 30 },
-                    ]}
-                    onSubmit={(scores) => handleSubmitEvaluation(bid.id, scores)}
-                    isSubmitting={isSubmitting}
-                  />
+        {tender && (
+          <div className="bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:px-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-2xl font-bold leading-6 text-gray-900">{tender.title}</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Posted by {tender.createdBy.name} from {tender.createdBy.organization.name}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Bid list and award options for buyers */}
-          {tender.bids.length > 0 && (user?.role === 'BUYER' || user?.role === 'ADMIN') && (
-            <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Submitted Bids</h4>
-              <div className="space-y-6">
-                {tender.bids.map((bid) => (
-                  <div key={bid.id} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h5 className="text-sm font-medium text-gray-900">
-                          {bid.submittedBy.organization.name}
-                        </h5>
-                        <p className="text-sm text-gray-500">
-                          Submitted by {bid.submittedBy.name}
-                        </p>
-                      </div>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        bid.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                        bid.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {bid.status}
-                      </span>
-                    </div>
-
-                    {bid.evaluations.length > 0 && (
-                      <div className="mt-4">
-                        <h6 className="text-sm font-medium text-gray-900">Evaluations</h6>
-                        <div className="mt-2 space-y-2">
-                          {bid.evaluations.map((evaluation) => (
-                            <div key={evaluation.id} className="bg-white rounded p-3">
-                              <div className="flex justify-between">
-                                <span className="text-sm font-medium">{evaluation.criteria}</span>
-                                <span className="text-sm">{evaluation.score}/100</span>
-                              </div>
-                              {evaluation.notes && (
-                                <p className="mt-1 text-sm text-gray-600">{evaluation.notes}</p>
-                              )}
-                              <p className="mt-1 text-xs text-gray-500">
-                                By {evaluation.reviewer.name}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {tender.status === 'UNDER_REVIEW' && (user?.role === 'BUYER' || user?.role === 'ADMIN') && (
-                      <div className="mt-4">
-                        <Button
-                          onClick={() => handleAwardTender(bid.id)}
-                          isLoading={isSubmitting}
-                        >
-                          Award Tender to this Bid
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                <span className={`px-2 py-1 text-sm font-semibold rounded-full ${
+                  tender.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' :
+                  tender.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+                  tender.status === 'AWARDED' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {tender.status}
+                </span>
               </div>
             </div>
-          )}
-        </div>
+            
+            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <dt className="text-sm font-medium text-gray-500">Description</dt>
+                  <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{tender.description}</dd>
+                </div>
+                
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Budget</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{formatCurrency(tender.budget)}</dd>
+                </div>
+                
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Deadline</dt>
+                  <dd className="mt-1 text-sm text-gray-900">{formatDate(new Date(tender.deadline))}</dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Action buttons based on user role and tender status */}
+            {user && (user.role === 'BUYER' || user.role === 'ADMIN') && tender.status === 'DRAFT' && (
+              <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
+                <Button
+                  onClick={handlePublishTender}
+                  isLoading={isSubmitting}
+                >
+                  Publish Tender
+                </Button>
+              </div>
+            )}
+
+            {/* Bid submission form for vendors */}
+            {user && user.role === 'VENDOR' && tender.status === 'PUBLISHED' && (
+              <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Submit Your Bid</h4>
+                <BidForm onSubmit={handleSubmitBid} isLoading={isSubmitting} />
+              </div>
+            )}
+
+            {/* Bid evaluation section for reviewers */}
+            {user && user.role === 'REVIEWER' && tender.bids && tender.bids.length > 0 && (
+              <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Pending Evaluations</h3>
+                {tender.bids.map((bid) => {
+                  // Check if the reviewer hasn't evaluated this bid yet
+                  const hasEvaluated = bid.evaluations.some((evaluation) => evaluation.reviewer.id === user.id);
+                  if (hasEvaluated) return null;
+
+                  return (
+                    <div key={bid.id} className="mb-8 last:mb-0 p-4 border rounded-lg">
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">
+                        Evaluate Bid from {bid.submittedBy.organization.name}
+                      </h4>
+                      <TenderEvaluation
+                        bidId={bid.id}
+                        criteria={[
+                          { id: '1', name: 'Technical Capability', description: 'Evaluate technical approach and methodology', weight: 40 },
+                          { id: '2', name: 'Price', description: 'Evaluate proposed budget and cost-effectiveness', weight: 30 },
+                          { id: '3', name: 'Timeline', description: 'Evaluate proposed timeline and delivery schedule', weight: 30 },
+                        ]}
+                        onSubmit={(data) => handleSubmitEvaluation(bid.id, data)}
+                        isSubmitting={isSubmitting}
+                      />
+                    </div>
+                  );
+                })}
+                {tender.bids.every(bid => bid.evaluations.some(evaluation => evaluation.reviewer.id === user.id)) && (
+                  <p className="text-sm text-gray-500">You have evaluated all available bids for this tender.</p>
+                )}
+              </div>
+            )}
+
+            {/* Bid list and award options for buyers */}
+            {tender.bids.length > 0 && (user?.role === 'BUYER' || user?.role === 'ADMIN') && (
+              <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
+                <h4 className="text-lg font-medium text-gray-900 mb-4">Submitted Bids</h4>
+                <div className="space-y-6">
+                  {tender.bids.map((bid) => (
+                    <div key={bid.id} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h5 className="text-sm font-medium text-gray-900">
+                            {bid.submittedBy.organization.name}
+                          </h5>
+                          <p className="text-sm text-gray-500">
+                            Submitted by {bid.submittedBy.name}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          bid.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
+                          bid.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {bid.status}
+                        </span>
+                      </div>
+
+                      {bid.evaluations.length > 0 && (
+                        <div className="mt-4">
+                          <h6 className="text-sm font-medium text-gray-900">Evaluations</h6>
+                          <div className="mt-2 space-y-2">
+                            {bid.evaluations.map((evaluation) => (
+                              <div key={evaluation.id} className="bg-white rounded p-3">
+                                <div className="flex justify-between">
+                                  <span className="text-sm font-medium">{evaluation.criteria}</span>
+                                  <span className="text-sm">{evaluation.score}/100</span>
+                                </div>
+                                {evaluation.notes && (
+                                  <p className="mt-1 text-sm text-gray-600">{evaluation.notes}</p>
+                                )}
+                                <p className="mt-1 text-xs text-gray-500">
+                                  By {evaluation.reviewer.name}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {tender.status === 'UNDER_REVIEW' && (user?.role === 'BUYER' || user?.role === 'ADMIN') && (
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => handleAwardTender(bid.id)}
+                            isLoading={isSubmitting}
+                          >
+                            Award Tender to this Bid
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );

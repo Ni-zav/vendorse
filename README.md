@@ -67,13 +67,35 @@ packages/
   - Automatic notifications
 
 ### 4. Evaluation System
-- Multi-reviewer evaluation process
-- Weighted scoring criteria:
-  - Technical Capability (40%)
-  - Price (30%)
-  - Timeline (30%)
-- Evaluation comments & recommendations
-- Final award decision workflow
+- Multi-reviewer evaluation process with weighted criteria:
+  - Technical Capability (40%): Technical approach and methodology
+  - Price (30%): Budget and cost-effectiveness evaluation
+  - Timeline (30%): Delivery schedule assessment
+- Evaluation Features:
+  - Score-based assessment (0-100 for each criterion)
+  - Detailed evaluation comments
+  - Three-way recommendation system:
+    - ACCEPT: Approve the bid
+    - REJECT: Decline the bid
+    - REQUEST_CLARIFICATION: Request additional information
+- Automated status updates:
+  - Updates bid status to UNDER_REVIEW on first evaluation
+  - Updates tender status based on evaluation progress
+  - Notification system for bid evaluations
+
+### 5. Workflow Automation
+- **Status Management**:
+  - Automatic tender status progression
+  - Bid status synchronization
+  - Evaluation-triggered updates
+- **Notification System**:
+  - Status change notifications
+  - Evaluation notifications
+  - Award notifications
+- **Audit Logging**:
+  - User actions tracking
+  - IP address logging
+  - Complete activity timeline
 
 ## User Management Guide
 
@@ -154,6 +176,24 @@ Then:
 - API route protection
 - Audit logging
 
+## Security Implementation
+
+### Authentication & Authorization
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Organization-level data isolation
+- IP tracking for security audit
+
+### Document Security
+- Document signature verification
+- Hash-based integrity checking
+- Secure file storage and retrieval
+
+### API Security
+- Protected routes with JWT validation
+- Role-based endpoint guards
+- Rate limiting and request validation
+
 ## Development Setup
 
 1. **Install Dependencies**:
@@ -198,3 +238,142 @@ pnpm dev:all
 2. Score based on criteria
 3. Add comments
 4. Submit evaluation
+
+## API Documentation
+
+### Tender Management
+```typescript
+// Create Tender
+POST /tenders
+Body: {
+  title: string
+  description: string
+  budget: number
+  deadline: Date
+}
+
+// Publish Tender
+PUT /tenders/:id/publish
+
+// List Tenders
+GET /tenders
+Query: {
+  status?: TenderStatus[]
+  search?: string
+  page?: number
+  limit?: number
+}
+```
+
+### Bid Management
+```typescript
+// Submit Bid
+POST /tenders/:id/bids
+Body: {
+  documents: Array<{
+    filePath: string
+    signatureHash: string
+  }>
+}
+
+// Evaluate Bid
+POST /tenders/bids/:id/evaluate
+Body: {
+  scores: Record<string, number>
+  comments: string
+  recommendation: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION'
+}
+
+// Award Tender
+PUT /tenders/:id/award/:bidId
+```
+
+## Data Models
+
+### Tender Status Flow
+```
+DRAFT → PUBLISHED → UNDER_REVIEW → AWARDED → COMPLETED
+```
+
+### Bid Status Flow
+```
+SUBMITTED → UNDER_REVIEW → ACCEPTED/REJECTED
+```
+
+### Evaluation Model
+```typescript
+interface Evaluation {
+  id: string
+  bidId: string
+  reviewerId: string
+  criteria: string
+  score: number
+  notes?: string
+  recommendation?: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION'
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+## Development Guidelines
+
+### Environment Setup
+// ...existing code...
+
+### Testing Strategy
+1. **Unit Tests**:
+   - Controller tests
+   - Service logic tests
+   - Component tests
+2. **Integration Tests**:
+   - API endpoint tests
+   - Database interaction tests
+3. **E2E Tests**:
+   - Complete workflow tests
+   - User journey tests
+
+### Deployment
+1. **Prerequisites**:
+   - Node.js 18+
+   - PostgreSQL 14+
+   - pnpm package manager
+2. **Build Process**:
+   ```bash
+   pnpm build
+   ```
+3. **Production Start**:
+   ```bash
+   pnpm start:prod
+   ```
+
+## Error Handling
+
+### API Error Responses
+```typescript
+{
+  error: string
+  message: string
+  statusCode: number
+}
+```
+
+### Common Error Types
+- Authentication errors (401)
+- Authorization errors (403)
+- Validation errors (400)
+- Not found errors (404)
+- Server errors (500)
+
+## Monitoring & Logging
+
+### Audit Trail
+- User actions
+- System events
+- Security events
+- Error tracking
+
+### Performance Metrics
+- API response times
+- Database query performance
+- File operation metrics
+- Authentication metrics

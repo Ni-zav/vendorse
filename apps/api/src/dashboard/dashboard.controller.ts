@@ -52,16 +52,12 @@ export class DashboardController {
       }
 
       case 'REVIEWER': {
-        const pendingEvaluations = await this.prisma.tender.count({
+        const pendingEvaluations = await this.prisma.bid.count({
           where: { 
-            status: 'UNDER_REVIEW',
-            bids: {
-              some: {
-                evaluations: {
-                  none: {
-                    reviewerId: userId
-                  }
-                }
+            status: 'SUBMITTED',
+            evaluations: {
+              none: {
+                reviewerId: userId
               }
             }
           }

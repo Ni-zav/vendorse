@@ -34,6 +34,7 @@ export interface TenderDetail {
       score: number;
       notes?: string;
       reviewer: {
+        id: string;
         name: string;
       };
     }>;

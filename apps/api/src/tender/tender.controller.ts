@@ -77,16 +77,48 @@ export class TenderController {
     @Request() req,
     @Param('id') bidId: string,
     @Body() evaluationDto: {
-      criteria: string;
-      score: number;
-      notes?: string;
+      scores: Record<string, number>;
+      comments: string;
+      recommendation: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION';
     }
   ) {
-    return this.tenderService.evaluateBid({
-      bidId,
-      reviewerId: req.user.id,
-      ...evaluationDto,
-    });
+    try {
+      console.log('Evaluating bid:', {
+        bidId,
+        reviewerId: req.user.id,
+        scores: evaluationDto.scores,
+        ip: req.ip
+      });
+
+      // Create an evaluation for each criterion
+      const evaluations = await Promise.all(
+        Object.entries(evaluationDto.scores).map(([criteriaId, score]) =>
+          this.tenderService.evaluateBid({
+            bidId,
+            reviewerId: req.user.id,
+            criteria: criteriaId,
+            score,
+            notes: evaluationDto.comments,
+            recommendation: evaluationDto.recommendation,
+            ipAddress: req.ip || '127.0.0.1'
+          })
+        )
+      );
+
+      console.log('Evaluations submitted successfully:', evaluations.length);
+      return evaluations;
+    } catch (error) {
+      console.error('Failed to evaluate bid:', {
+        bidId,
+        reviewerId: req.user.id,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
+      throw error;
+    }
   }
 
   @Put(':id/award/:bidId')
@@ -107,18 +139,50 @@ export class TenderController {
   @Get()
   async listTenders(
     @Request() req,
-    @Query('status') status?: string[],
+    @Query('status') status?: string | string[],
     @Query('search') search?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number
   ) {
-    return this.tenderService.listTenders({
-      status: status?.map(s => s as TenderStatus),
-      search,
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-      role: req.user.role,
-    });
+    try {
+      console.log('Listing tenders request:', {
+        userId: req.user.id,
+        role: req.user.role,
+        status,
+        search
+      });
+
+      // Ensure status is always an array
+      const statusArray = status ? (Array.isArray(status) ? status : [status]) : undefined;
+
+      const result = await this.tenderService.listTenders({
+        status: statusArray?.map(s => s as TenderStatus),
+        search,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        role: req.user.role,
+        userId: req.user.id
+      });
+
+      console.log('Tenders found:', {
+        count: result.tenders.length,
+        total: result.total,
+        page: result.page
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error listing tenders:', {
+        userId: req.user.id,
+        role: req.user.role,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
+      throw error;
+    }
   }
 
   @Get('bids/vendor')
