@@ -4,27 +4,48 @@ Currently Implemented:
 
 - Multiple user roles: ADMIN, BUYER, VENDOR, REVIEWER
 - Organization-based access control
-- Authentication using JWT
+- JWT-based authentication
+- Basic audit logging with IP tracking
+- Role-based authorization guards
 
 2. Tender Management
 
 - Create and publish tenders (BUYER/ADMIN)
 - View tender listings with search and filters
 - Tender lifecycle: DRAFT → PUBLISHED → UNDER_REVIEW → AWARDED → COMPLETED
-- File attachments for tender documents
+- File attachments with signature verification
+- Pagination and search functionality
 
 3. Bid Management
 
 - Submit bids with supporting documents (VENDOR)
 - Bid status tracking (SUBMITTED → UNDER_REVIEW → ACCEPTED/REJECTED)
 - Document verification using signature hashes
+- Bid listing and filtering by status
 
 4. Evaluation System
 
 - Multi-reviewer evaluation process
-- Scoring criteria with weights
-- Evaluation comments and recommendations
-- Final bid acceptance/rejection
+- Weighted scoring criteria (Technical: 40%, Price: 30%, Timeline: 30%)
+- Detailed evaluation comments
+- Three-way recommendation system (Accept/Reject/Request Clarification)
+- Automatic status updates based on evaluations
+
+5. Workflow Automation
+
+- Automatic tender/bid status progression
+- Basic notification system for status changes
+- IP-tracked audit logging
+- Role-based access controls
+- Evaluation-triggered status updates
+
+6. Security Features
+
+- JWT-based authentication
+- Role-based route protection
+- Document signature verification
+- Organization-level data isolation
+- IP address logging for security audit
 
 Suggested New Features:
 
