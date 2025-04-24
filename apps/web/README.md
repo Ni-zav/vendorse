@@ -6,61 +6,117 @@
 - React 19.0
 - TypeScript 5.8
 - TailwindCSS 4.1
-- Node.js 18.18+ or 20.9+
+- Headless UI
+- React Dropzone
 
-## Project Setup
+## Getting Started
 
+1. **Install Dependencies**:
 ```bash
-# Install dependencies
-$ pnpm install
-
-# Set up environment variables
-$ cp .env.example .env
+pnpm install
 ```
 
-## Development
-
+2. **Environment Setup**:
 ```bash
-# Start development server
-$ pnpm dev
-
-# Build for production
-$ pnpm build
-
-# Start production server
-$ pnpm start
+cp .env.example .env
 ```
+
+Required environment variables:
+```
+API_URL=http://localhost:3003
+```
+
+3. **Development Server**:
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+## Key Features
+
+### 1. Authentication & Authorization
+- JWT-based auth with secure token storage
+- Role-based access control (BUYER, VENDOR, REVIEWER)
+- Protected route components
+
+### 2. Tender Management
+- Create and publish tenders
+- File uploads with signature verification
+- Search and filter capabilities
+- Status tracking and notifications
+
+### 3. Bid Management
+- Submit bids with supporting documents
+- Track bid status and evaluations
+- View evaluation scores and feedback
+
+### 4. Evaluation System
+- Score-based bid evaluation
+- Weighted criteria assessment
+- Recommendation system
 
 ## Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router pages
-│   ├── api/               # API routes
-│   ├── bids/             # Bid management pages
-│   ├── evaluations/      # Evaluation pages
-│   └── tenders/          # Tender management pages
-├── components/           # Reusable components
-├── contexts/            # React contexts
-└── public/             # Static assets
+├── app/                # Next.js 13+ App Router
+│   ├── api/           # API route handlers
+│   ├── auth/          # Authentication pages
+│   ├── tenders/       # Tender management
+│   ├── bids/          # Bid management
+│   └── dashboard/     # Analytics dashboard
+├── components/        # Shared components
+│   ├── AppLayout     # Main layout wrapper
+│   ├── ProtectedRoute # Auth protection HOC
+│   └── Form/         # Form components
+└── contexts/         # React contexts
 ```
 
-## Key Features
+## Available Commands
 
-- Role-based access control
-- Tender management interface
-- Bid submission system
-- Evaluation workflow
-- Document handling
-- Real-time notifications
+```bash
+# Development
+pnpm dev         # Start development server
+pnpm build       # Build for production
+pnpm start       # Start production server
+pnpm lint        # Run ESLint
+```
 
-## Environment Variables
+## Component Library
 
-- `API_URL`: Backend API endpoint
-- `NEXT_PUBLIC_APP_URL`: Frontend application URL
+We use a shared UI component library (`@vendorse/ui`) that includes:
+- Form components
+- Button variants
+- File upload
+- Tender evaluation forms
+- Data display cards
 
-## Learn More
+## Best Practices
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [React Documentation](https://react.dev)
-- [TailwindCSS Documentation](https://tailwindcss.com/docs)
+1. **State Management**
+   - Use React Context for global state
+   - Keep component state local when possible
+   - Implement proper error boundaries
+
+2. **Performance**
+   - Implement proper loading states
+   - Use Next.js image optimization
+   - Implement proper caching strategies
+
+3. **Security**
+   - Validate all user input
+   - Implement proper CSRF protection
+   - Secure token management
+
+## Deployment
+
+The application is optimized for deployment on Vercel, but can be deployed to any platform that supports Next.js.
+
+For detailed deployment instructions, see our [main documentation](../README.md#deployment).
+
+## Related Documentation
+
+- [Main Project Documentation](../README.md)
+- [API Documentation](../api/README.md)
+- [UI Component Library](../../packages/ui/README.md)

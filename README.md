@@ -18,14 +18,14 @@ A full-stack e-procurement system that manages the complete lifecycle of tenders
 ## Project Structure
 ```
 apps/
-├── api/                 # NestJS Backend API
+├── api/                 # NestJS Backend API ([API Documentation](apps/api/README.md))
 │   ├── src/
 │   │   ├── auth/       # Authentication & Authorization
 │   │   ├── tender/     # Tender management
 │   │   ├── dashboard/  # Dashboard statistics
 │   │   └── file/       # File handling
 │   └── test/
-└── web/                # Next.js Frontend
+└── web/                # Next.js Frontend ([Web Documentation](apps/web/README.md))
     ├── src/
     │   ├── app/        # Next.js 13+ App Router
     │   ├── components/ # Shared components
@@ -323,7 +323,49 @@ interface Evaluation {
 ## Development Guidelines
 
 ### Environment Setup
-// ...existing code...
+
+1. **Prerequisites Installation**:
+   ```bash
+   # Install Node.js LTS (18.18+ or 20.9+)
+   # Install PostgreSQL 14+
+   # Install pnpm
+   npm install -g pnpm@10.9
+   ```
+
+2. **Environment Variables**:
+   ```bash
+   # Root directory
+   cp .env.example .env
+   
+   # API directory
+   cp apps/api/.env.example apps/api/.env
+   
+   # Web directory
+   cp apps/web/.env.example apps/web/.env
+   ```
+
+3. **Database Configuration**:
+   - Create a PostgreSQL database
+   - Update database connection string in:
+     - `packages/database/.env`
+     - `apps/api/.env`
+
+4. **AWS Configuration** (for file storage):
+   - Create an S3 bucket
+   - Configure AWS credentials in `apps/api/.env`:
+     ```
+     AWS_ACCESS_KEY_ID=your_access_key
+     AWS_SECRET_ACCESS_KEY=your_secret_key
+     AWS_REGION=your_region
+     AWS_BUCKET_NAME=your_bucket_name
+     ```
+
+5. **JWT Configuration**:
+   - Generate a secure secret key
+   - Add to `apps/api/.env`:
+     ```
+     JWT_SECRET=your_secure_secret
+     ```
 
 ### Testing Strategy
 1. **Unit Tests**:
