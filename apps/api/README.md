@@ -21,54 +21,80 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+# Vendorse API
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Technology Stack
 
-## Project setup
+- NestJS 11.0
+- TypeScript 5.8
+- Prisma 6.6 ORM
+- Node.js 18.18+ or 20.9+
 
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+## Project Setup
 
 ```bash
-# unit tests
-$ npm run test
+# Install dependencies
+$ pnpm install
 
-# e2e tests
-$ npm run test:e2e
+# Set up environment variables
+$ cp .env.example .env
 
-# test coverage
-$ npm run test:cov
+# Generate Prisma client
+$ pnpm prisma generate
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Development
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Start in development mode
+$ pnpm dev
+
+# Start with file watching
+$ pnpm start:dev
+
+# Start in production mode
+$ pnpm start:prod
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Testing
+
+```bash
+# Unit tests
+$ pnpm test
+
+# E2E tests
+$ pnpm test:e2e
+
+# Test coverage
+$ pnpm test:cov
+```
+
+## Project Structure
+
+```
+src/
+├── auth/              # Authentication & authorization
+│   ├── decorators/    # Custom decorators
+│   ├── guards/        # JWT and role guards
+│   └── strategies/    # Passport strategies
+├── tender/            # Tender management
+├── dashboard/         # Analytics & statistics
+├── file/             # File handling
+└── app/              # Core application
+```
+
+## Key Features
+
+- JWT-based authentication
+- Role-based access control (RBAC)
+- Organization-based data isolation
+- File upload with signature verification
+- Comprehensive audit logging
+- Automated notifications
+
+## API Documentation
+
+See the root README.md for complete API endpoint documentation.
 
 ## Resources
 

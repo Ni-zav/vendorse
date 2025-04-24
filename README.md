@@ -4,11 +4,16 @@
 A full-stack e-procurement system that manages the complete lifecycle of tenders, bids, and evaluations.
 
 ## Tech Stack
-- **Frontend**: Next.js (React) with TypeScript
-- **Backend**: NestJS with TypeScript
-- **Database**: PostgreSQL with Prisma ORM
+- **Frontend**: Next.js 15.3 (React 19) with TypeScript 5.8
+- **Backend**: NestJS 11 with TypeScript 5.8
+- **Database**: PostgreSQL with Prisma 6.6 ORM
 - **Authentication**: JWT-based
-- **Package Manager**: pnpm with Turborepo (Monorepo)
+- **Package Manager**: pnpm 10.9 with Turborepo
+
+## Requirements
+- Node.js 18.18+ or 20.9+
+- PostgreSQL 14+
+- pnpm 10.9+
 
 ## Project Structure
 ```
