@@ -117,6 +117,6 @@ For detailed deployment instructions, see our [main documentation](../README.md#
 
 ## Related Documentation
 
-- [Main Project Documentation](../README.md)
-- [API Documentation](../api/README.md)
-- [UI Component Library](../../packages/ui/README.md)
+- [Main Project Documentation](/README.md)
+- [API Documentation](/apps/api/README.md)
+- [UI Component Library](/packages/ui/README.md)

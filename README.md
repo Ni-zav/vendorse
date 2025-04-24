@@ -18,14 +18,14 @@ A full-stack e-procurement system that manages the complete lifecycle of tenders
 ## Project Structure
 ```
 apps/
-├── api/                 # NestJS Backend API ([API Documentation](apps/api/README.md))
+├── api/                 # NestJS Backend API ([Documentation](/apps/api/README.md))
 │   ├── src/
 │   │   ├── auth/       # Authentication & Authorization
 │   │   ├── tender/     # Tender management
 │   │   ├── dashboard/  # Dashboard statistics
 │   │   └── file/       # File handling
 │   └── test/
-└── web/                # Next.js Frontend ([Web Documentation](apps/web/README.md))
+└── web/                # Next.js Frontend ([Documentation](/apps/web/README.md))
     ├── src/
     │   ├── app/        # Next.js 13+ App Router
     │   ├── components/ # Shared components
@@ -33,9 +33,9 @@ apps/
     └── public/         # Static assets
 
 packages/
-├── database/           # Prisma schema & migrations
-├── shared/            # Shared types & utilities
-└── ui/                # Reusable UI components
+├── database/           # Prisma schema & migrations ([Documentation](/packages/database/README.md))
+├── shared/            # Shared types & utilities ([Documentation](/packages/shared/README.md))
+└── ui/                # Reusable UI components ([Documentation](/packages/ui/README.md))
 ```
 
 ## Core Features

@@ -96,6 +96,12 @@ src/
 
 See the root README.md for complete API endpoint documentation.
 
+## Related Documentation
+
+- [Main Project Documentation](/README.md)
+- [Web Application](/apps/web/README.md)
+- [Database Documentation](/packages/database/README.md)
+
 ## Resources
 
 Check out a few resources that may come in handy when working with NestJS:

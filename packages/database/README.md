@@ -117,6 +117,6 @@ model Bid {
 
 ## Related Documentation
 
-- [Main Project Documentation](../../README.md)
-- [API Documentation](../../apps/api/README.md)
-- [Web Application](../../apps/web/README.md)
+- [Main Project Documentation](/README.md)
+- [API Documentation](/apps/api/README.md)
+- [Web Application](/apps/web/README.md)

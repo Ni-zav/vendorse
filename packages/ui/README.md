@@ -137,6 +137,6 @@ pnpm clean
 
 ## Related Documentation
 
-- [Main Project Documentation](../../README.md)
-- [Web Application](../../apps/web/README.md)
-- [API Documentation](../../apps/api/README.md)
+- [Main Project Documentation](/README.md)
+- [Web Application](/apps/web/README.md)
+- [Shared Package Documentation](/packages/shared/README.md)

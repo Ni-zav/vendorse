@@ -1,6 +1,7 @@
-# Vendorse Shared Types & Utilities
+# Vendorse Shared Package
 
-A shared package containing common types, interfaces, and utilities used across the Vendorse platform.
+## Overview
+Shared types, interfaces, and utilities used across the Vendorse platform.
 
 ## Installation
 
@@ -11,57 +12,39 @@ pnpm install @vendorse/shared@workspace:*
 
 ## Contents
 
-### Common Types
+### Types
+- User and organization types
+- Tender and bid interfaces
+- Evaluation system types
+- API response types
+
+### Utilities
+- Date formatting
+- File hash generation
+- Validation helpers
+- Type guards
+
+## Usage
 
 ```typescript
-// User Types
-type UserRole = 'ADMIN' | 'BUYER' | 'VENDOR' | 'REVIEWER';
-type OrganizationType = 'GOVERNMENT' | 'BUSINESS' | 'NON_PROFIT';
+import { 
+  User,
+  Organization,
+  Tender,
+  Bid,
+  EvaluationScore,
+  TenderStatus,
+  BidStatus,
+  Role
+} from '@vendorse/shared';
 
-// Tender Types
-type TenderStatus = 'DRAFT' | 'PUBLISHED' | 'UNDER_REVIEW' | 'AWARDED' | 'COMPLETED';
-type BidStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED';
-type EvaluationRecommendation = 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION';
-```
-
-### Interfaces
-
-```typescript
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  orgId: string;
-}
-
-interface Organization {
-  id: string;
-  name: string;
-  type: OrganizationType;
-  address: string;
-}
-
-interface Tender {
-  id: string;
-  title: string;
-  description: string;
-  budget: number;
-  deadline: Date;
-  status: TenderStatus;
-  createdById: string;
-  // ... other fields
-}
-
-interface Bid {
-  id: string;
-  tenderId: string;
-  submittedById: string;
-  orgId: string;
-  status: BidStatus;
-  documents: BidDocument[];
-  // ... other fields
-}
+// Use types in your components/services
+const user: User = {
+  id: '1',
+  name: 'John Doe',
+  email: 'john@example.com',
+  role: Role.VENDOR
+};
 ```
 
 ## Development
@@ -80,25 +63,8 @@ pnpm build
 pnpm clean
 ```
 
-## Usage
-
-```typescript
-import { UserRole, TenderStatus, User } from '@vendorse/shared';
-
-// Use in type definitions
-interface AuthenticatedRequest {
-  user: User;
-}
-
-// Use in conditions
-function canPublishTender(status: TenderStatus, role: UserRole): boolean {
-  return status === 'DRAFT' && (role === 'ADMIN' || role === 'BUYER');
-}
-```
-
 ## Related Documentation
 
-- [Main Project Documentation](../../README.md)
-- [Web Application](../../apps/web/README.md)
-- [API Documentation](../../apps/api/README.md)
-- [UI Component Library](../ui/README.md)
+- [Main Project Documentation](/README.md)
+- [API Documentation](/apps/api/README.md)
+- [UI Components](/packages/ui/README.md)
