@@ -12,10 +12,18 @@ interface FileUploadProps {
   error?: string;
 }
 
+function formatSize(size: number) {
+  if (size < 1024 * 1024) {
+    return Math.max(1, Math.round(size / 1024)) + ' KB';
+  }
+
+  return (size / 1024 / 1024).toFixed(1) + ' MB';
+}
+
 export function FileUpload({
   onUpload,
   maxFiles = 1,
-  maxSize = 5 * 1024 * 1024, // 5MB default
+  maxSize = 5 * 1024 * 1024,
   accept,
   error,
 }: FileUploadProps) {
@@ -28,22 +36,31 @@ export function FileUpload({
       setFiles(newFiles);
       onUpload(newFiles);
 
-      const errors = rejectedFiles.map((file) => {
+      const errors = rejectedFiles.map((rejection) => {
+        const file = rejection.file || rejection;
+
         if (file.size > maxSize) {
-          return `${file.name} is too large. Maximum size is ${Math.round(maxSize / 1024 / 1024)}MB`;
+          return (
+            file.name +
+            ' is too large. Maximum size is ' +
+            Math.round(maxSize / 1024 / 1024) +
+            'MB.'
+          );
         }
+
         if (file.type && !Object.keys(accept || {}).includes(file.type)) {
-          return `${file.name} has an unsupported file type`;
+          return file.name + ' has an unsupported file type.';
         }
-        return `${file.name} could not be uploaded`;
+
+        return file.name + ' could not be added.';
       });
 
       setUploadErrors(errors);
     },
-    [files, maxFiles, maxSize, accept, onUpload]
+    [files, maxFiles, maxSize, accept, onUpload],
   );
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop,
     maxFiles,
     maxSize,
@@ -51,7 +68,7 @@ export function FileUpload({
   });
 
   const removeFile = (index: number) => {
-    const newFiles = files.filter((_, i) => i !== index);
+    const newFiles = files.filter((_, fileIndex) => fileIndex !== index);
     setFiles(newFiles);
     onUpload(newFiles);
   };
@@ -60,64 +77,74 @@ export function FileUpload({
     <div className="space-y-4">
       <div
         {...getRootProps()}
-        className={`
-          border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
-          ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
-          ${error ? 'border-red-300' : ''}
-        `}
+        className={[
+          'group flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-8 text-center transition',
+          isDragActive
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50',
+          isFocused ? 'ring-2 ring-blue-500 ring-offset-2' : '',
+          error ? 'border-red-300' : '',
+        ].join(' ')}
       >
         <input {...getInputProps()} />
-        <div className="space-y-2">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition group-hover:bg-white">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="h-6 w-6"
             stroke="currentColor"
             fill="none"
-            viewBox="0 0 48 48"
+            viewBox="0 0 24 24"
             aria-hidden="true"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 14v20c0 4.418 3.582 8 8 8h16c4.418 0 8-3.582 8-8V14M8 14c0-4.418 3.582-8 8-8h16c4.418 0 8 3.582 8 8m-9 8l-3-3m0 0l-3 3m3-3v12"
+              strokeWidth={1.8}
+              d="M12 16V4m0 0L8 8m4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"
             />
           </svg>
-          <p className="text-sm text-gray-600">
-            {isDragActive
-              ? 'Drop the files here...'
-              : 'Drag and drop files here, or click to select files'}
-          </p>
-          <p className="text-xs text-gray-500">
-            Maximum {maxFiles} file{maxFiles > 1 ? 's' : ''}, up to{' '}
-            {Math.round(maxSize / 1024 / 1024)}MB each
-          </p>
         </div>
+        <p className="mt-4 text-sm font-semibold text-slate-900">
+          {isDragActive ? 'Drop documents to add them' : 'Upload proposal documents'}
+        </p>
+        <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+          Drag and drop or choose files. Up to {maxFiles} document
+          {maxFiles > 1 ? 's' : ''}, {Math.round(maxSize / 1024 / 1024)}MB each.
+        </p>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-700">{error}</p>}
 
       {uploadErrors.length > 0 && (
-        <div className="bg-red-50 p-4 rounded-md">
-          {uploadErrors.map((error, index) => (
-            <p key={index} className="text-sm text-red-600">
-              {error}
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          {uploadErrors.map((message) => (
+            <p key={message} className="text-sm text-red-700">
+              {message}
             </p>
           ))}
         </div>
       )}
 
       {files.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="space-y-2" aria-label="Selected proposal documents">
           {files.map((file, index) => (
             <li
-              key={index}
-              className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
+              key={file.name + '-' + file.lastModified}
+              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="text-sm text-gray-600">{file.name}</span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {file.name}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {formatSize(file.size)}
+                </p>
+              </div>
               <Button
-                variant="danger"
+                type="button"
+                variant="outline"
                 size="sm"
                 onClick={() => removeFile(index)}
+                className="w-full sm:w-auto"
               >
                 Remove
               </Button>
