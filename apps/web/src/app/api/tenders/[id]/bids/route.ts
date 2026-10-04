@@ -2,43 +2,41 @@ import { NextRequest } from 'next/server';
 
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const params = context.params;
-    const body = await req.json();
+    const { id } = await context.params;
     const authHeader = req.headers.get('authorization');
-    
+
     if (!authHeader) {
       return Response.json(
         { error: 'Authorization header is missing' },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const response = await fetch(`${apiUrl}/tenders/${params.id}/bids`, {
+    const response = await fetch(apiUrl + '/tenders/' + id + '/bids', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader
+        Authorization: authHeader,
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(await req.json()),
     });
 
-    const data = await response.json();
-    return Response.json(data, { 
-      status: response.status,
-      statusText: response.statusText
-    });
+    const text = await response.text();
+    let payload: unknown;
+
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = { error: text || 'Failed to submit bid' };
+    }
+
+    return Response.json(payload, { status: response.status });
   } catch (error) {
-    console.error('API Route - Submit bid failed:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    
-    return Response.json(
-      { error: 'Failed to submit bid' },
-      { status: 500 }
-    );
+    console.error('Bid submission proxy failed', error);
+    return Response.json({ error: 'Failed to submit bid' }, { status: 500 });
   }
 }
