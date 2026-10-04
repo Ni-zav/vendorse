@@ -2,15 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TenderCard } from '@vendorse/ui';
+import { Button, TenderCard } from '@vendorse/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { ProtectedRoute } from '../components/ProtectedRoute';
-import { Tender } from '@vendorse/shared';
 
-interface EvaluationTender extends Tender {
-  _count: {
+interface EvaluationTender {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  deadline: string;
+  status: string;
+  createdBy: {
+    organization: {
+      name: string;
+    };
+  };
+  _count?: {
     bids: number;
-    evaluations: number;
   };
 }
 
@@ -23,107 +32,126 @@ export default function EvaluationsPage() {
 
   useEffect(() => {
     const fetchEvaluations = async () => {
-      if (!user || user.role !== 'REVIEWER') {
-        setError('Unauthorized access');
-        setIsLoading(false);
-        return;
-      }
-
       try {
+        setError(null);
         const token = localStorage.getItem('token');
+
         if (!token) {
-          setError('Authentication required');
-          setIsLoading(false);
+          router.push('/login');
           return;
         }
 
-        const response = await fetch('/api/tenders?status=UNDER_REVIEW', {
+        const response = await fetch('/api/tenders?limit=100', {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: 'Bearer ' + token,
           },
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch evaluations: ${response.statusText}`);
+          throw new Error('Could not load the evaluation queue.');
         }
 
         const data = await response.json();
-        setTenders(data.tenders || []);
-      } catch (error) {
-        console.error('Error fetching evaluations:', error);
-        setError('Failed to load evaluations. Please try again later.');
+        setTenders(Array.isArray(data.tenders) ? data.tenders : []);
+      } catch (loadError) {
+        console.error('Error fetching evaluation queue:', loadError);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Could not load the evaluation queue.',
+        );
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchEvaluations();
-  }, [user]);
-
-  const handleTenderClick = (tenderId: string) => {
-    router.push(`/tenders/${tenderId}`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">{error}</h3>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    if (user?.role === 'REVIEWER') {
+      fetchEvaluations();
+    }
+  }, [user, router]);
 
   return (
     <ProtectedRoute allowedRoles={['REVIEWER']}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Pending Evaluations</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Review and evaluate submitted bids for the following tenders
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">
+            Evaluation workspace
           </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.isArray(tenders) && tenders.length > 0 ? (
-            tenders.map((tender) => (
-              <div key={tender.id} className="flex flex-col">
-                <TenderCard
-                  {...tender}
-                  onClick={() => handleTenderClick(tender.id)}
-                />
-                <div className="mt-2 flex justify-between text-sm text-gray-500">
-                  <span>{tender._count?.bids || 0} bids submitted</span>
-                  <span>{tender._count?.evaluations || 0} evaluations completed</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900">No pending evaluations</h3>
-              <p className="mt-2 text-sm text-gray-500">
-                There are currently no tenders that require your evaluation
+          <div className="mt-2 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="text-3xl font-black tracking-tight text-slate-950">
+                Evaluation queue
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Only tenders with at least one bid that still requires your
+                scorecard appear here. Scoring becomes available after the
+                submission deadline and each reviewer submits one atomic scorecard
+                per bid.
               </p>
             </div>
-          )}
-        </div>
+            <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+                Tenders in queue
+              </p>
+              <p className="mt-1 text-3xl font-black">{tenders.length}</p>
+            </div>
+          </div>
+        </header>
+
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="mt-6 grid animate-pulse gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="h-64 rounded-2xl bg-slate-200" />
+            ))}
+          </div>
+        ) : tenders.length > 0 ? (
+          <>
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+              Keep scoring evidence-based and independent. Vendor-facing screens do
+              not expose your identity, working score, or evaluation notes.
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {tenders.map((tender) => (
+                <TenderCard
+                  key={tender.id}
+                  id={tender.id}
+                  title={tender.title}
+                  description={tender.description}
+                  budget={tender.budget}
+                  deadline={tender.deadline}
+                  status={tender.status}
+                  createdBy={tender.createdBy}
+                  bidCount={tender._count?.bids || 0}
+                  onClick={() => router.push('/tenders/' + tender.id)}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+            <p className="text-sm font-bold text-slate-950">
+              No scorecards waiting
+            </p>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+              The queue is clear. A sourcing event appears here when a submitted
+              bid is eligible for your evaluation and you have not already scored
+              it.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard')}
+              className="mt-5"
+            >
+              Back to dashboard
+            </Button>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );
