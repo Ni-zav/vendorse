@@ -1,17 +1,39 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TenderCard, Button } from '@vendorse/ui';
+import { Button, TenderCard } from '@vendorse/ui';
+import { Tender } from '@vendorse/shared';
 import { useAuth } from '../contexts/AuthContext';
 import { ProtectedRoute } from '../components/ProtectedRoute';
-import { Tender, TenderStatus } from '@vendorse/shared';
 
 interface DashboardStats {
   totalTenders: number;
   activeTenders: number;
   submittedBids: number;
   pendingEvaluations: number;
+}
+
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -27,39 +49,38 @@ export default function DashboardPage() {
       try {
         setError(null);
         const token = localStorage.getItem('token');
+
         if (!token) {
-          throw new Error('No authentication token found');
+          throw new Error('Your session has expired.');
         }
-        
-        // Fetch data in parallel
+
         const [tendersResponse, statsResponse] = await Promise.all([
           fetch('/api/tenders?limit=6', {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: 'Bearer ' + token },
           }),
           fetch('/api/dashboard/stats', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-        ]);
-        
-        if (!tendersResponse.ok || !statsResponse.ok) {
-          const tendersError = !tendersResponse.ok ? await tendersResponse.text() : '';
-          const statsError = !statsResponse.ok ? await statsResponse.text() : '';
-          throw new Error(
-            'Failed to load dashboard data: ' + 
-            [tendersError, statsError].filter(Boolean).join(', ')
-          );
-        }
-        
-        const [tendersData, statsData] = await Promise.all([
-          tendersResponse.json(),
-          statsResponse.json()
+            headers: { Authorization: 'Bearer ' + token },
+          }),
         ]);
 
-        setTenders(tendersData.tenders);
+        if (!tendersResponse.ok || !statsResponse.ok) {
+          throw new Error('The procurement workspace could not be loaded.');
+        }
+
+        const [tendersData, statsData] = await Promise.all([
+          tendersResponse.json(),
+          statsResponse.json(),
+        ]);
+
+        setTenders(Array.isArray(tendersData.tenders) ? tendersData.tenders : []);
         setStats(statsData);
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      } catch (loadError) {
+        console.error('Error fetching dashboard data:', loadError);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'The procurement workspace could not be loaded.',
+        );
       } finally {
         setIsLoading(false);
       }
@@ -70,210 +91,65 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  const renderRoleSpecificActions = () => {
-    if (!user) return null;
+  const closingSoon = useMemo(
+    () =>
+      tenders.filter((tender) => {
+        if (tender.status !== 'PUBLISHED') return false;
+        const hours =
+          (new Date(tender.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
+        return hours > 0 && hours <= 72;
+      }).length,
+    [tenders],
+  );
 
-    switch (user.role) {
-      case 'ADMIN':
-        return (
-          <div className="flex space-x-4">
-            <Button onClick={() => router.push('/users')}>
-              Manage Users
-            </Button>
-            <Button onClick={() => router.push('/tenders/new')}>
-              Create New Tender
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/tenders')}
-            >
-              View All Tenders
-            </Button>
-          </div>
-        );
-      
+  const roleContext = useMemo(() => {
+    switch (user?.role) {
       case 'BUYER':
-        return (
-          <div className="flex space-x-4">
-            <Button onClick={() => router.push('/tenders/new')}>
-              Create New Tender
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/tenders')}
-            >
-              View All Tenders
-            </Button>
-          </div>
-        );
-      
+        return {
+          eyebrow: 'Buyer workspace',
+          title: 'Move sourcing work forward',
+          description:
+            'Create controlled tenders, monitor live response windows, and move evaluated bids toward award.',
+        };
       case 'VENDOR':
-        return (
-          <div className="flex space-x-4">
-            <Button onClick={() => router.push('/bids')}>
-              View My Bids
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push('/tenders')}
-            >
-              Browse Tenders
-            </Button>
-          </div>
-        );
-      
+        return {
+          eyebrow: 'Supplier workspace',
+          title: 'Find opportunities and track submissions',
+          description:
+            'Prioritize open tenders, submit proposal packages, and follow your bid status without exposing evaluation internals.',
+        };
       case 'REVIEWER':
-        return (
-          <Button onClick={() => router.push('/evaluations')}>
-            View Pending Evaluations
-          </Button>
-        );
-
+        return {
+          eyebrow: 'Evaluation workspace',
+          title: 'Work the evaluation queue',
+          description:
+            'Score eligible proposals after the bidding window closes and leave a defensible rationale for every recommendation.',
+        };
+      case 'ADMIN':
+        return {
+          eyebrow: 'Platform administration',
+          title: 'Keep procurement moving',
+          description:
+            'Monitor sourcing activity, manage users, and support buyers through the tender lifecycle.',
+        };
       default:
-        return null;
+        return {
+          eyebrow: 'Procurement workspace',
+          title: 'Welcome to Vendorse',
+          description: 'Your role-aware sourcing workspace.',
+        };
     }
-  };
-
-  const renderStats = () => {
-    if (!stats) return null;
-
-    return (
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {user?.role === 'BUYER' && (
-          <>
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Tenders
-                      </dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">
-                          {stats.totalTenders}
-                        </div>
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                      <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Active Tenders
-                      </dt>
-                      <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">
-                          {stats.activeTenders}
-                        </div>
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {user?.role === 'VENDOR' && (
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Submitted Bids
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900">
-                        {stats.submittedBids}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {user?.role === 'REVIEWER' && (
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Pending Evaluations
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900">
-                        {stats.pendingEvaluations}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+  }, [user?.role]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error loading dashboard</h3>
-              <p className="mt-2 text-sm text-red-700">{error}</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="mt-2 text-sm font-medium text-red-800 hover:text-red-900"
-              >
-                Try again
-              </button>
-            </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="animate-pulse space-y-6">
+          <div className="h-32 rounded-3xl bg-slate-200" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="h-28 rounded-2xl bg-slate-200" />
+            ))}
           </div>
         </div>
       </div>
@@ -282,28 +158,140 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="md:flex md:items-center md:justify-between mb-8">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-              Welcome, {user?.name || user?.email}
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {user?.organization?.name && `${user.organization.name} - `}{user?.role}
-            </p>
-          </div>
-          <div className="mt-4 flex md:mt-0 md:ml-4">
-            {renderRoleSpecificActions()}
-          </div>
-        </div>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <section className="overflow-hidden rounded-3xl bg-slate-950 px-5 py-6 text-white shadow-sm sm:px-8 sm:py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-300">
+                {roleContext.eyebrow}
+              </p>
+              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">
+                {roleContext.title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                {roleContext.description}
+              </p>
+              <p className="mt-4 text-xs text-slate-400">
+                Signed in as {user?.name || user?.email}
+                {user?.organization?.name ? ' · ' + user.organization.name : ''}
+              </p>
+            </div>
 
-        {renderStats()}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
+              {(user?.role === 'BUYER' || user?.role === 'ADMIN') && (
+                <Button
+                  onClick={() => router.push('/tenders/new')}
+                  className="w-full bg-white text-slate-950 hover:bg-slate-100 sm:w-auto"
+                >
+                  Create tender
+                </Button>
+              )}
+              {user?.role === 'VENDOR' && (
+                <Button
+                  onClick={() => router.push('/tenders')}
+                  className="w-full bg-white text-slate-950 hover:bg-slate-100 sm:w-auto"
+                >
+                  Browse tenders
+                </Button>
+              )}
+              {user?.role === 'REVIEWER' && (
+                <Button
+                  onClick={() => router.push('/evaluations')}
+                  className="w-full bg-white text-slate-950 hover:bg-slate-100 sm:w-auto"
+                >
+                  Open evaluation queue
+                </Button>
+              )}
+              {user?.role === 'ADMIN' && (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/users')}
+                  className="w-full border-slate-700 bg-slate-900 text-white hover:bg-slate-800 sm:w-auto"
+                >
+                  Manage users
+                </Button>
+              )}
+            </div>
+          </div>
+        </section>
 
-        <div className="mt-8">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            {user?.role === 'VENDOR' ? 'Available Tenders' : 'Recent Tenders'}
-          </h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="ml-2 font-bold underline underline-offset-2"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {stats && (
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {(user?.role === 'BUYER' || user?.role === 'ADMIN') && (
+              <>
+                <StatCard
+                  label="Tender portfolio"
+                  value={stats.totalTenders}
+                  detail="Total sourcing events in your current scope."
+                />
+                <StatCard
+                  label="Active sourcing"
+                  value={stats.activeTenders}
+                  detail="Published or under-review tenders."
+                />
+              </>
+            )}
+            {user?.role === 'VENDOR' && (
+              <StatCard
+                label="Submitted bids"
+                value={stats.submittedBids}
+                detail="Proposal packages submitted from this account."
+              />
+            )}
+            {user?.role === 'REVIEWER' && (
+              <StatCard
+                label="Pending scorecards"
+                value={stats.pendingEvaluations}
+                detail="Bids still requiring your independent evaluation."
+              />
+            )}
+            <StatCard
+              label="Closing soon"
+              value={closingSoon}
+              detail="Visible open tenders closing within 72 hours."
+            />
+          </section>
+        )}
+
+        <section className="mt-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Work queue
+              </p>
+              <h2 className="mt-1 text-xl font-black text-slate-950">
+                {user?.role === 'VENDOR'
+                  ? 'Open opportunities'
+                  : user?.role === 'REVIEWER'
+                    ? 'Tenders needing review'
+                    : 'Recent tenders'}
+              </h2>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() =>
+                router.push(user?.role === 'REVIEWER' ? '/evaluations' : '/tenders')
+              }
+              className="w-full sm:w-auto"
+            >
+              View full queue
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {tenders.map((tender) => (
               <TenderCard
                 key={tender.id}
@@ -314,22 +302,25 @@ export default function DashboardPage() {
                 deadline={tender.deadline}
                 status={tender.status}
                 createdBy={tender.createdBy}
-                bidCount={tender._count?.bids || 0} // Pass bid count to TenderCard
-                onClick={() => router.push(`/tenders/${tender.id}`)}
+                bidCount={tender._count?.bids || 0}
+                onClick={() => router.push('/tenders/' + tender.id)}
               />
             ))}
-            {tenders.length === 0 && (
-              <div className="col-span-full text-center py-12">
-                <h3 className="text-lg font-medium text-gray-900">No tenders found</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  {user?.role === 'VENDOR'
-                    ? 'Check back later for new tender opportunities'
-                    : 'Create a new tender to get started'}
-                </p>
-              </div>
-            )}
           </div>
-        </div>
+
+          {tenders.length === 0 && (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
+              <p className="text-sm font-bold text-slate-900">Queue is clear</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                {user?.role === 'VENDOR'
+                  ? 'No published opportunities are available right now.'
+                  : user?.role === 'REVIEWER'
+                    ? 'There are no bids awaiting your scorecard.'
+                    : 'No tenders are in scope yet.'}
+              </p>
+            </div>
+          )}
+        </section>
       </div>
     </ProtectedRoute>
   );
