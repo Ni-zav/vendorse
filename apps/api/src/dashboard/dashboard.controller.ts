@@ -14,60 +14,77 @@ export class DashboardController {
   @Get('stats')
   async getStats(@Request() req) {
     const { id: userId, role } = req.user;
-    
+
     switch (role) {
-      case 'BUYER':
-      case 'ADMIN': {
+      case 'BUYER': {
         const [totalTenders, activeTenders] = await Promise.all([
           this.prisma.tender.count({
-            where: { createdById: userId }
+            where: { createdById: userId },
           }),
           this.prisma.tender.count({
-            where: { 
+            where: {
               createdById: userId,
-              status: 'PUBLISHED'
-            }
-          })
+              status: { in: ['PUBLISHED', 'UNDER_REVIEW'] },
+            },
+          }),
         ]);
 
         return {
           totalTenders,
           activeTenders,
           submittedBids: 0,
-          pendingEvaluations: 0
+          pendingEvaluations: 0,
+        };
+      }
+
+      case 'ADMIN': {
+        const [totalTenders, activeTenders] = await Promise.all([
+          this.prisma.tender.count(),
+          this.prisma.tender.count({
+            where: {
+              status: { in: ['PUBLISHED', 'UNDER_REVIEW'] },
+            },
+          }),
+        ]);
+
+        return {
+          totalTenders,
+          activeTenders,
+          submittedBids: 0,
+          pendingEvaluations: 0,
         };
       }
 
       case 'VENDOR': {
         const submittedBids = await this.prisma.bid.count({
-          where: { submittedById: userId }
+          where: { submittedById: userId },
         });
 
         return {
           totalTenders: 0,
           activeTenders: 0,
           submittedBids,
-          pendingEvaluations: 0
+          pendingEvaluations: 0,
         };
       }
 
       case 'REVIEWER': {
         const pendingEvaluations = await this.prisma.bid.count({
-          where: { 
-            status: 'SUBMITTED',
+          where: {
+            status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
             evaluations: {
               none: {
-                reviewerId: userId
-              }
-            }
-          }
+                reviewerId: userId,
+              },
+            },
+          },
         });
 
         return {
           totalTenders: 0,
           activeTenders: 0,
           submittedBids: 0,
-          pendingEvaluations
+          pendingEvaluations,
         };
       }
 
@@ -76,7 +93,7 @@ export class DashboardController {
           totalTenders: 0,
           activeTenders: 0,
           submittedBids: 0,
-          pendingEvaluations: 0
+          pendingEvaluations: 0,
         };
     }
   }
