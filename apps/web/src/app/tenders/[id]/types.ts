@@ -1,19 +1,18 @@
-import { Tender, Bid, Document, Evaluation } from '@vendorse/shared';
-
-// Convert dates to string format for the API response
-type StringDates<T> = {
-  [K in keyof T]: T[K] extends Date ? string : T[K];
-};
-
 export interface TenderDetail {
   id: string;
   title: string;
   description: string;
   budget: number;
   status: string;
-  deadline: string; // Date as string
-  createdAt: string; // Date as string
-  updatedAt: string; // Date as string
+  deadline: string;
+  createdAt: string;
+  updatedAt: string;
+  documents: Array<{
+    id: string;
+    filePath: string;
+    fileType: string;
+    uploadedAt: string;
+  }>;
   createdBy: {
     id: string;
     name: string;
@@ -25,14 +24,20 @@ export interface TenderDetail {
   bids: Array<{
     id: string;
     status: string;
-    createdAt: string; // Date as string
-    updatedAt: string; // Date as string
-    documents: Array<Pick<Document, 'id' | 'filePath'>>;
+    submittedAt: string;
+    updatedAt: string;
+    documents: Array<{
+      id: string;
+      filePath: string;
+      signatureHash: string;
+      uploadedAt: string;
+    }>;
     evaluations: Array<{
       id: string;
       criteria: string;
       score: number;
       notes?: string;
+      recommendation?: string;
       reviewer: {
         id: string;
         name: string;
