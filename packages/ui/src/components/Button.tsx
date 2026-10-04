@@ -17,62 +17,62 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200';
-  
+  const baseStyles =
+    'inline-flex items-center justify-center gap-2 rounded-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition disabled:pointer-events-none';
   const variantStyles = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-    outline: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+    primary:
+      'bg-slate-950 text-white shadow-sm hover:bg-slate-800 active:bg-slate-900',
+    secondary:
+      'bg-slate-100 text-slate-900 hover:bg-slate-200 active:bg-slate-300',
+    outline:
+      'border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 active:bg-slate-100',
+    danger:
+      'bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800',
   };
-
   const sizeStyles = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
+    sm: 'min-h-9 px-3 py-1.5 text-xs',
+    md: 'min-h-11 px-4 py-2.5 text-sm',
+    lg: 'min-h-12 px-5 py-3 text-base',
   };
-
   const isDisabled = disabled || isLoading;
 
   return (
     <button
-      className={`
-        ${baseStyles}
-        ${variantStyles[variant]}
-        ${sizeStyles[size]}
-        ${fullWidth ? 'w-full' : ''}
-        ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
-        ${className}
-      `}
+      className={[
+        baseStyles,
+        variantStyles[variant],
+        sizeStyles[size],
+        fullWidth ? 'w-full' : '',
+        isDisabled ? 'cursor-not-allowed opacity-55' : '',
+        className,
+      ].join(' ')}
       disabled={isDisabled}
+      aria-busy={isLoading || undefined}
       {...props}
     >
-      {isLoading ? (
-        <>
-          <svg
-            className="animate-spin -ml-1 mr-2 h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-          Processing...
-        </>
-      ) : (
-        children
+      {isLoading && (
+        <svg
+          className="h-4 w-4 animate-spin"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
       )}
+      {children}
     </button>
   );
 }
