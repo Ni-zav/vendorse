@@ -40,4 +40,4 @@ jobs:
         run: pnpm build
 
       - name: Run API unit tests
-        run: pnpm --filter api test -- --runInBand
+        run: pnpm --filter api test --runInBand
