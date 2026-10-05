@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, FormField, Input, Select } from '@vendorse/ui';
-import { useAuth } from '../contexts/AuthContext';
+import { Button, FormField, Select, StatusBadge } from '@vendorse/ui';
 import { ProtectedRoute } from '../components/ProtectedRoute';
-import { UserRole, UserStatus } from '@vendorse/shared';
 
-interface User {
+interface UserRecord {
   id: string;
   email: string;
   name: string;
@@ -27,236 +25,325 @@ interface Pagination {
   totalPages: number;
 }
 
+const roleLabel = (role: string) =>
+  ({
+    ADMIN: 'Administrator',
+    BUYER: 'Buyer',
+    VENDOR: 'Vendor',
+    REVIEWER: 'Reviewer',
+  })[role] || role;
+
 export default function UsersPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
     page: 1,
     pageSize: 10,
     totalPages: 1,
   });
+  const [filters, setFilters] = useState({ role: '', status: '' });
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    role: '',
-    status: '',
-  });
+  const [error, setError] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchUsers = async () => {
+      setIsLoading(true);
+      setError('');
+
       try {
-        setError(null);
         const token = localStorage.getItem('token');
+
         if (!token) {
-          throw new Error('No authentication token found');
+          throw new Error('Your session has expired.');
         }
 
-        const queryParams = new URLSearchParams({
-          page: pagination.page.toString(),
-          limit: pagination.pageSize.toString(),
-          ...(filters.role && { role: filters.role }),
-          ...(filters.status && { status: filters.status }),
+        const query = new URLSearchParams({
+          page: String(pagination.page),
+          limit: String(pagination.pageSize),
         });
 
-        const response = await fetch(`/api/users?${queryParams}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        if (filters.role) query.set('role', filters.role);
+        if (filters.status) query.set('status', filters.status);
+
+        const response = await fetch('/api/users?' + query.toString(), {
+          headers: { Authorization: 'Bearer ' + token },
         });
+        const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-          throw new Error('Failed to fetch users');
+          throw new Error(
+            payload?.message || payload?.error || 'Could not load user accounts.',
+          );
         }
 
-        const data = await response.json();
-        setUsers(data.users);
-        setPagination(data.pagination);
-      } catch (err) {
-        console.error('Error fetching users:', err);
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+        if (!cancelled) {
+          setUsers(Array.isArray(payload?.users) ? payload.users : []);
+          setPagination((current) => ({
+            ...current,
+            ...(payload?.pagination || {}),
+          }));
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : 'Could not load user accounts.',
+          );
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    fetchUsers();
-  }, [pagination.page, pagination.pageSize, filters]);
+    void fetchUsers();
 
-  const handlePageChange = (newPage: number) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    return () => {
+      cancelled = true;
+    };
+  }, [pagination.page, pagination.pageSize, filters.role, filters.status]);
+
+  const changeFilter = (field: 'role' | 'status', value: string) => {
+    setFilters((current) => ({ ...current, [field]: value }));
+    setPagination((current) => ({ ...current, page: 1 }));
   };
 
-  const handleFilterChange = (field: 'role' | 'status', value: string) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
-
-  const handleEditUser = (userId: string) => {
-    router.push(`/users/${userId}`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading users</h3>
-                <p className="mt-2 text-sm text-red-700">{error}</p>
-                <button 
-                  onClick={() => window.location.reload()} 
-                  className="mt-2 text-sm font-medium text-red-800 hover:text-red-900"
-                >
-                  Try again
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const firstResult =
+    pagination.total === 0
+      ? 0
+      : (pagination.page - 1) * pagination.pageSize + 1;
+  const lastResult = Math.min(
+    pagination.page * pagination.pageSize,
+    pagination.total,
+  );
 
   return (
     <ProtectedRoute allowedRoles={['ADMIN']}>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="md:flex md:items-center md:justify-between mb-8">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-                User Management
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <section className="rounded-3xl bg-slate-950 px-5 py-6 text-white sm:px-8 sm:py-8">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-300">
+            Platform administration
+          </p>
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
+                User access
               </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                Review platform accounts, organization context, roles, and access
+                state. Account edits are recorded in the procurement audit log.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Accounts in scope
+              </p>
+              <p className="mt-1 text-2xl font-black">{pagination.total}</p>
             </div>
           </div>
+        </section>
 
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField label="Filter by Role">
-                  <Select
-                    name="role"
-                    value={filters.role}
-                    onChange={(value) => handleFilterChange('role', value)}
-                    options={[
-                      { value: '', label: 'All Roles' },
-                      { value: 'ADMIN', label: 'Admin' },
-                      { value: 'BUYER', label: 'Buyer' },
-                      { value: 'VENDOR', label: 'Vendor' },
-                      { value: 'REVIEWER', label: 'Reviewer' },
-                    ]}
-                  />
-                </FormField>
-                <FormField label="Filter by Status">
-                  <Select
-                    name="status"
-                    value={filters.status}
-                    onChange={(value) => handleFilterChange('status', value)}
-                    options={[
-                      { value: '', label: 'All Statuses' },
-                      { value: 'ACTIVE', label: 'Active' },
-                      { value: 'INACTIVE', label: 'Inactive' },
-                      { value: 'SUSPENDED', label: 'Suspended' },
-                    ]}
-                  />
-                </FormField>
-              </div>
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:max-w-2xl">
+            <FormField label="Role">
+              <Select
+                name="role"
+                value={filters.role}
+                onChange={(value) => changeFilter('role', value)}
+                options={[
+                  { value: '', label: 'All roles' },
+                  { value: 'ADMIN', label: 'Administrator' },
+                  { value: 'BUYER', label: 'Buyer' },
+                  { value: 'VENDOR', label: 'Vendor' },
+                  { value: 'REVIEWER', label: 'Reviewer' },
+                ]}
+              />
+            </FormField>
+
+            <FormField label="Account status">
+              <Select
+                name="status"
+                value={filters.status}
+                onChange={(value) => changeFilter('status', value)}
+                options={[
+                  { value: '', label: 'All statuses' },
+                  { value: 'ACTIVE', label: 'Active' },
+                  { value: 'INACTIVE', label: 'Inactive' },
+                  { value: 'SUSPENDED', label: 'Suspended' },
+                ]}
+              />
+            </FormField>
+          </div>
+        </section>
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {error}
+          </div>
+        )}
+
+        <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {isLoading ? (
+            <div className="space-y-3 p-5">
+              {[0, 1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-20 animate-pulse rounded-xl bg-slate-100"
+                />
+              ))}
             </div>
+          ) : users.length === 0 ? (
+            <div className="px-5 py-14 text-center">
+              <p className="text-sm font-black text-slate-900">
+                No accounts match these filters
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Change the role or status filter to broaden the account list.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-slate-100 lg:hidden">
+                {users.map((account) => (
+                  <article key={account.id} className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-950">
+                          {account.name}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {account.email}
+                        </p>
+                      </div>
+                      <StatusBadge status={account.status} />
+                    </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name/Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Organization
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.organization.name}</div>
-                        <div className="text-sm text-gray-500">{user.organization.type}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                          ${user.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                            user.status === 'INACTIVE' ? 'bg-gray-100 text-gray-800' :
-                            'bg-red-100 text-red-800'}`}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Button
-                          variant="secondary"
-                          onClick={() => handleEditUser(user.id)}
-                        >
-                          Edit
-                        </Button>
-                      </td>
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-slate-500">Role</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {roleLabel(account.role)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-slate-500">Organization</p>
+                        <p className="mt-1 truncate font-bold text-slate-900">
+                          {account.organization.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/users/' + account.id)}
+                      className="mt-4 w-full"
+                    >
+                      Manage account
+                    </Button>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      {['Account', 'Organization', 'Role', 'Status', ''].map(
+                        (heading) => (
+                          <th
+                            key={heading || 'actions'}
+                            className="px-5 py-3 text-left text-[11px] font-black uppercase tracking-[0.1em] text-slate-500"
+                          >
+                            {heading}
+                          </th>
+                        ),
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Showing {(pagination.page - 1) * pagination.pageSize + 1} to {' '}
-                  {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{' '}
-                  {pagination.total} users
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page === pagination.totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {users.map((account) => (
+                      <tr key={account.id} className="hover:bg-slate-50/70">
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-bold text-slate-950">
+                            {account.name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {account.email}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {account.organization.name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {account.organization.type.replaceAll('_', ' ')}
+                          </p>
+                        </td>
+                        <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+                          {roleLabel(account.role)}
+                        </td>
+                        <td className="px-5 py-4">
+                          <StatusBadge status={account.status} />
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/users/' + account.id)}
+                          >
+                            Manage
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            </>
+          )}
+
+          <div className="flex flex-col gap-4 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-xs text-slate-500">
+              Showing {firstResult}–{lastResult} of {pagination.total}
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPagination((current) => ({
+                    ...current,
+                    page: Math.max(1, current.page - 1),
+                  }))
+                }
+                disabled={pagination.page <= 1 || isLoading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPagination((current) => ({
+                    ...current,
+                    page: Math.min(current.totalPages, current.page + 1),
+                  }))
+                }
+                disabled={
+                  pagination.page >= pagination.totalPages || isLoading
+                }
+              >
+                Next
+              </Button>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </ProtectedRoute>
   );

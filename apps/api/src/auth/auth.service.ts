@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaClient } from '@vendorse/database';
 import { OrgType } from '@vendorse/shared';
@@ -13,8 +17,9 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: {
         id: true,
         email: true,
@@ -44,42 +49,54 @@ export class AuthService {
     };
   }
 
-  async register(email: string, password: string, name: string, orgId: string, role: string) {
+  async registerVendor(data: {
+    email: string;
+    password: string;
+    name: string;
+    organization: {
+      name: string;
+      type: OrgType;
+      address: string;
+    };
+  }) {
+    const email = data.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
+      select: { id: true },
     });
 
     if (existingUser) {
-      throw new UnauthorizedException('Email already registered');
+      throw new ConflictException('Email already registered');
     }
 
-    const hashedPassword = await hash(password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        orgId,
-        role: role as any,
-        status: 'ACTIVE',
-      },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
+    const hashedPassword = await hash(data.password, 12);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          name: data.organization.name.trim(),
+          type: data.organization.type,
+          address: data.organization.address.trim(),
+        },
+      });
+
+      return tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name: data.name.trim(),
+          orgId: organization.id,
+          role: 'VENDOR',
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      });
     });
 
     return this.login(user);
-  }
-
-  async createOrganization(name: string, type: OrgType, address: string) {
-    return this.prisma.organization.create({
-      data: {
-        name,
-        type,
-        address,
-      },
-    });
   }
 }

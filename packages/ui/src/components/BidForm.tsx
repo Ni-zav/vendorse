@@ -4,140 +4,145 @@ import { useState } from 'react';
 import { Button } from './Button';
 import { FileUpload } from './FileUpload';
 
+interface BidDocumentPayload {
+  filePath: string;
+  signatureHash: string;
+}
+
 interface BidFormProps {
-  onSubmit: (data: {
-    price: number;
-    deliveryTimeInDays: number;
-    description: string;
-    files: File[];
-  }) => void;
+  onSubmit: (data: { documents: BidDocumentPayload[] }) => Promise<void> | void;
   isLoading?: boolean;
 }
 
-export function BidForm({ onSubmit, isLoading }: BidFormProps) {
-  const [price, setPrice] = useState('');
-  const [deliveryTimeInDays, setDeliveryTimeInDays] = useState('');
-  const [description, setDescription] = useState('');
+async function hashFile(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function uploadProposalFile(file: File): Promise<BidDocumentPayload> {
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+
+  const uploadUrlResponse = await fetch('/api/files/upload-url', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+    }),
+  });
+
+  const uploadUrlPayload = await uploadUrlResponse.json();
+
+  if (!uploadUrlResponse.ok || !uploadUrlPayload?.url || !uploadUrlPayload?.fields?.key) {
+    throw new Error(
+      uploadUrlPayload?.message ||
+        uploadUrlPayload?.error ||
+        'Could not prepare the proposal upload.',
+    );
+  }
+
+  const uploadResponse = await fetch(uploadUrlPayload.url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new Error('A proposal document could not be uploaded.');
+  }
+
+  return {
+    filePath: uploadUrlPayload.fields.key,
+    signatureHash: await hashFile(file),
+  };
+}
+
+export function BidForm({ onSubmit, isLoading = false }: BidFormProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!price || isNaN(Number(price)) || Number(price) <= 0) {
-      newErrors.price = 'Please enter a valid price';
-    }
-
-    if (!deliveryTimeInDays || isNaN(Number(deliveryTimeInDays)) || Number(deliveryTimeInDays) <= 0) {
-      newErrors.deliveryTimeInDays = 'Please enter a valid delivery time';
-    }
-
-    if (!description.trim()) {
-      newErrors.description = 'Please provide a description';
-    }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
 
     if (files.length === 0) {
-      newErrors.files = 'Please upload at least one file';
+      setError('Upload at least one proposal document before submitting.');
+      return;
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setIsUploading(true);
+
+    try {
+      const documents = await Promise.all(files.map(uploadProposalFile));
+      await onSubmit({ documents });
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : 'The bid could not be submitted.',
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
-
-    onSubmit({
-      price: Number(price),
-      deliveryTimeInDays: Number(deliveryTimeInDays),
-      description,
-      files,
-    });
-  };
+  const busy = isLoading || isUploading;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-          Price
-        </label>
-        <div className="mt-1">
-          <input
-            type="number"
-            id="price"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
-            placeholder="Enter your bid amount"
-          />
-          {errors.price && (
-            <p className="mt-1 text-sm text-red-600">{errors.price}</p>
-          )}
-        </div>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <p className="text-sm font-semibold text-slate-900">Proposal package</p>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          Upload the signed proposal documents that contain your commercial offer,
+          delivery commitments, technical response, and required evidence.
+        </p>
       </div>
 
-      <div>
-        <label htmlFor="deliveryTime" className="block text-sm font-medium text-gray-700">
-          Delivery Time (in days)
-        </label>
-        <div className="mt-1">
-          <input
-            type="number"
-            id="deliveryTime"
-            value={deliveryTimeInDays}
-            onChange={(e) => setDeliveryTimeInDays(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
-            placeholder="Enter estimated delivery time"
-          />
-          {errors.deliveryTimeInDays && (
-            <p className="mt-1 text-sm text-red-600">{errors.deliveryTimeInDays}</p>
-          )}
-        </div>
+      <FileUpload
+        onUpload={setFiles}
+        maxFiles={5}
+        maxSize={10 * 1024 * 1024}
+        accept={{
+          'application/pdf': ['.pdf'],
+          'application/msword': ['.doc'],
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [
+            '.docx',
+          ],
+        }}
+        error={error || undefined}
+      />
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <p className="text-xs leading-5 text-amber-900">
+          Submission is final for this MVP. Review the document set carefully before
+          sending it; structured pricing and delivery fields are tracked as a follow-up
+          product migration.
+        </p>
       </div>
 
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-          Description
-        </label>
-        <div className="mt-1">
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-800 bg-white"
-            placeholder="Describe your proposal"
-          />
-          {errors.description && (
-            <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-          )}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Supporting Documents
-        </label>
-        <div className="mt-1">
-          <FileUpload
-            onUpload={setFiles}
-            maxFiles={5}
-            maxSize={10 * 1024 * 1024} // 10MB
-            accept={{
-              'application/pdf': ['.pdf'],
-              'application/msword': ['.doc'],
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-            }}
-            error={errors.files}
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Button type="submit" isLoading={isLoading}>
-          Submit Bid
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <Button
+          type="submit"
+          isLoading={busy}
+          disabled={busy}
+          className="w-full sm:w-auto"
+        >
+          {isUploading ? 'Uploading proposal' : 'Submit bid'}
         </Button>
       </div>
     </form>

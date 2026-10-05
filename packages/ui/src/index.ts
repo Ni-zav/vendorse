@@ -6,6 +6,7 @@ export * from './components/Form/Input';
 export * from './components/Form/RadioGroup';
 export * from './components/Form/Select';
 export * from './components/Form/TextArea';
+export * from './components/StatusBadge';
 export * from './components/TenderCard';
 export * from './components/BidForm';
 export * from './components/TenderEvaluation';

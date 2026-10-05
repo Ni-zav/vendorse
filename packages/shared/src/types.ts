@@ -1,9 +1,26 @@
 export type UserRole = 'ADMIN' | 'VENDOR' | 'BUYER' | 'REVIEWER';
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type OrgType = 'BUSINESS' | 'GOVERNMENT' | 'NON_PROFIT';
-export type TenderStatus = 'DRAFT' | 'PUBLISHED' | 'UNDER_REVIEW' | 'AWARDED' | 'CANCELLED' | 'COMPLETED';
-export type BidStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED';
-export type NotificationType = 'TENDER_PUBLISHED' | 'BID_SUBMITTED' | 'BID_EVALUATED' | 'TENDER_AWARDED' | 'SYSTEM_NOTIFICATION';
+export type TenderStatus =
+  | 'DRAFT'
+  | 'PUBLISHED'
+  | 'UNDER_REVIEW'
+  | 'AWARDED'
+  | 'CANCELLED'
+  | 'COMPLETED';
+export type BidStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'WITHDRAWN';
+export type NotificationType =
+  | 'TENDER_PUBLISHED'
+  | 'BID_SUBMITTED'
+  | 'BID_EVALUATED'
+  | 'TENDER_AWARDED'
+  | 'SYSTEM_NOTIFICATION';
 
 export interface User {
   id: string;
@@ -28,50 +45,23 @@ export interface Organization {
   updatedAt: Date;
 }
 
-export interface Tender {
-  id: string;
-  title: string;
-  description: string;
-  budget: number;
-  deadline: Date;
-  status: TenderStatus;
-  createdById: string;
-  createdBy: User;
-  documents: Document[];
-  bids: Bid[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Bid {
+export interface TenderDocument {
   id: string;
   tenderId: string;
-  tender: Tender;
-  submittedById: string;
-  submittedBy: User;
-  orgId: string;
-  organization: Organization;
-  amount: number;
-  description: string;
-  status: BidStatus;
-  documents: Document[];
-  evaluations: Evaluation[];
-  submittedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Document {
-  id: string;
-  fileName: string;
   filePath: string;
   fileType: string;
-  signatureHash?: string;
-  uploadedById: string;
-  uploadedBy: User;
-  createdAt: Date;
-  updatedAt: Date;
+  uploadedAt: Date;
 }
+
+export interface BidDocument {
+  id: string;
+  bidId: string;
+  filePath: string;
+  signatureHash: string;
+  uploadedAt: Date;
+}
+
+export type Document = TenderDocument | BidDocument;
 
 export interface Evaluation {
   id: string;
@@ -82,7 +72,41 @@ export interface Evaluation {
   criteria: string;
   score: number;
   notes?: string;
+  recommendation?: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION';
   createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Tender {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  deadline: Date;
+  status: TenderStatus;
+  createdById: string;
+  createdBy: User;
+  documents: TenderDocument[];
+  bids: Bid[];
+  createdAt: Date;
+  updatedAt: Date;
+  _count?: {
+    bids: number;
+  };
+}
+
+export interface Bid {
+  id: string;
+  tenderId: string;
+  tender: Tender;
+  submittedById: string;
+  submittedBy: User;
+  orgId: string;
+  organization: Organization;
+  status: BidStatus;
+  documents: BidDocument[];
+  evaluations: Evaluation[];
+  submittedAt: Date;
   updatedAt: Date;
 }
 

@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { CalendarIcon, CurrencyDollarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { formatCurrency, formatDate } from '@vendorse/shared';
+import { StatusBadge } from './StatusBadge';
 
 interface TenderCardProps {
   id: string;
@@ -14,7 +14,6 @@ interface TenderCardProps {
       name: string;
     };
   };
-  bids?: Array<any>;
   bidCount?: number;
   onClick?: () => void;
   className?: string;
@@ -31,65 +30,77 @@ export function TenderCard({
   onClick,
   className = '',
 }: TenderCardProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PUBLISHED':
-        return 'bg-green-100 text-green-800';
-      case 'UNDER_REVIEW':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'AWARDED':
-        return 'bg-blue-100 text-blue-800';
-      case 'CLOSED':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const deadlineDate = new Date(deadline);
+  const hoursRemaining = Math.ceil(
+    (deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60),
+  );
+  const urgency =
+    status === 'PUBLISHED' && hoursRemaining > 0 && hoursRemaining <= 72
+      ? hoursRemaining <= 24
+        ? 'Closes within 24 hours'
+        : 'Closes within 3 days'
+      : null;
 
-  return (
-    <div
-      className={`bg-white shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200 ${
-        onClick ? 'cursor-pointer' : ''
-      } ${className}`}
-      onClick={onClick}
-    >
-      <div className="p-6">
-        <div className="flex justify-between items-start">
-          <h3 className="text-lg font-medium text-gray-900 truncate">
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            {createdBy.organization.name}
+          </p>
+          <h3 className="mt-2 text-lg font-bold leading-6 text-slate-950">
             {title}
           </h3>
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-              status
-            )}`}
-          >
-            {status}
-          </span>
         </div>
-        <p className="mt-1 text-sm text-gray-600 truncate">{description}</p>
-        <dl className="mt-4 space-y-2">
-          <div className="flex justify-between">
-            <dt className="text-sm font-medium text-gray-500">Budget</dt>
-            <dd className="text-sm text-gray-900">{formatCurrency(budget)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-sm font-medium text-gray-500">Deadline</dt>
-            <dd className="text-sm text-gray-900">
-              {formatDate(new Date(deadline))}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-sm font-medium text-gray-500">Posted by</dt>
-            <dd className="text-sm text-gray-900">{createdBy.organization.name}</dd>
-          </div>
-          {typeof bidCount === 'number' && (
-            <div className="flex justify-between">
-              <dt className="text-sm font-medium text-gray-500">Bids</dt>
-              <dd className="text-sm text-gray-900">{bidCount}</dd>
-            </div>
-          )}
-        </dl>
+        <StatusBadge status={status} />
       </div>
-    </div>
+
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+        {description}
+      </p>
+
+      <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+        <div>
+          <dt className="text-xs font-medium text-slate-500">Budget ceiling</dt>
+          <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
+            {formatCurrency(budget)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-slate-500">Submission deadline</dt>
+          <dd className="mt-1 text-sm font-semibold text-slate-900">
+            {formatDate(deadlineDate)}
+          </dd>
+        </div>
+        {typeof bidCount === 'number' && (
+          <div className="col-span-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+            <dt className="text-xs font-medium text-slate-500">Responses received</dt>
+            <dd className="text-sm font-bold text-slate-900">{bidCount}</dd>
+          </div>
+        )}
+      </dl>
+
+      {urgency && (
+        <p className="mt-4 text-xs font-semibold text-amber-700">{urgency}</p>
+      )}
+    </>
   );
+
+  const classes = [
+    'h-full w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition',
+    onClick
+      ? 'hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2'
+      : '',
+    className,
+  ].join(' ');
+
+  if (onClick) {
+    return (
+      <button type="button" className={classes} onClick={onClick}>
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={classes}>{body}</div>;
 }
