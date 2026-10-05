@@ -11,6 +11,7 @@ import { TenderStatus } from '@vendorse/shared';
 type RequestUser = {
   id: string;
   role: string;
+  orgId?: string;
 };
 
 @Injectable()
@@ -204,6 +205,21 @@ export class TenderService {
       throw new NotFoundException('Bid not found');
     }
 
+    const reviewer = await this.prisma.user.findUnique({
+      where: { id: data.reviewerId },
+      select: { orgId: true },
+    });
+
+    if (!reviewer) {
+      throw new NotFoundException('Reviewer not found');
+    }
+
+    if (reviewer.orgId === bid.orgId) {
+      throw new ForbiddenException(
+        'Reviewers cannot evaluate a bid from their own organization',
+      );
+    }
+
     if (!['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status)) {
       throw new ForbiddenException('Bid is not available for evaluation');
     }
@@ -299,7 +315,10 @@ export class TenderService {
         bids: {
           include: {
             evaluations: {
-              select: { id: true },
+              select: {
+                id: true,
+                recommendation: true,
+              },
             },
           },
         },
@@ -323,8 +342,30 @@ export class TenderService {
       throw new BadRequestException('Selected bid does not belong to this tender');
     }
 
-    if (winningBid.evaluations.length === 0) {
-      throw new ConflictException('Selected bid must have at least one submitted evaluation');
+    if (!['SUBMITTED', 'UNDER_REVIEW'].includes(winningBid.status)) {
+      throw new ConflictException('Selected bid is not eligible for award');
+    }
+
+    const unevaluatedBids = tender.bids.filter(
+      (bid) =>
+        ['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status) &&
+        bid.evaluations.length === 0,
+    );
+
+    if (unevaluatedBids.length > 0) {
+      throw new ConflictException(
+        'Every active bid must have at least one submitted evaluation before award',
+      );
+    }
+
+    if (
+      !winningBid.evaluations.some(
+        (evaluation) => evaluation.recommendation === 'ACCEPT',
+      )
+    ) {
+      throw new ConflictException(
+        'Selected bid must have an accept recommendation before award',
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -381,6 +422,7 @@ export class TenderService {
         id: true,
         createdById: true,
         status: true,
+        deadline: true,
       },
     });
 
@@ -403,9 +445,17 @@ export class TenderService {
       throw new ForbiddenException('This tender is not available for review');
     }
 
+    if (user.role === 'REVIEWER' && baseTender.deadline > new Date()) {
+      throw new ForbiddenException(
+        'Bid materials remain sealed until the submission deadline',
+      );
+    }
+
     const bidWhere: Prisma.BidWhereInput | undefined =
       user.role === 'VENDOR'
-        ? { submittedById: user.id }
+        ? user.orgId
+          ? { orgId: user.orgId }
+          : { submittedById: user.id }
         : user.role === 'REVIEWER'
           ? {
               status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
@@ -472,9 +522,9 @@ export class TenderService {
     return tender;
   }
 
-  async getUserBids(userId: string) {
+  async getVendorBids(userId: string, orgId?: string) {
     return this.prisma.bid.findMany({
-      where: { submittedById: userId },
+      where: orgId ? { orgId } : { submittedById: userId },
       include: {
         tender: {
           select: {
@@ -510,6 +560,7 @@ export class TenderService {
       where.status = 'PUBLISHED';
     } else if (role === 'REVIEWER') {
       where.status = status?.length ? { in: status } : { in: ['PUBLISHED', 'UNDER_REVIEW'] };
+      where.deadline = { lte: new Date() };
       where.bids = {
         some: {
           status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
