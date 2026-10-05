@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useCallback, useState, useEffect } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
 
 interface User {
@@ -31,58 +37,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check for stored token and validate it
     const token = localStorage.getItem('token');
-    if (token) {
-      fetch('/api/auth/profile', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setUser(data);
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
+
+    if (!token) {
       setIsLoading(false);
+      return;
     }
+
+    const validateSession = async () => {
+      try {
+        const response = await fetch('/api/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Session is no longer valid');
+        }
+
+        const profile = await response.json();
+        setUser(profile);
+      } catch {
+        localStorage.removeItem('token');
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void validateSession();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!res.ok) {
-      throw new Error('Invalid credentials');
-    }
+      const payload = await response.json().catch(() => null);
 
-    const { accessToken } = await res.json();
-    localStorage.setItem('token', accessToken);
+      if (!response.ok || !payload?.accessToken) {
+        throw new Error(
+          payload?.message || payload?.error || 'Invalid credentials',
+        );
+      }
 
-    const userRes = await fetch('/api/auth/profile', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+      const accessToken = payload.accessToken as string;
+      localStorage.setItem('token', accessToken);
 
-    const userData = await userRes.json();
-    setUser(userData);
-    router.push('/dashboard');
-  }, [router]);
+      try {
+        const profileResponse = await fetch('/api/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!profileResponse.ok) {
+          throw new Error('Could not load account profile');
+        }
+
+        const profile = await profileResponse.json();
+        setUser(profile);
+        router.replace('/dashboard');
+      } catch (error) {
+        localStorage.removeItem('token');
+        setUser(null);
+        throw error;
+      }
+    },
+    [router],
+  );
 
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     setUser(null);
-    router.push('/login');
+    router.replace('/login');
   }, [router]);
 
   return (
@@ -94,8 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
+
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 }
