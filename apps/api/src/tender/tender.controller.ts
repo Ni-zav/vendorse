@@ -108,7 +108,7 @@ export class TenderController {
   @Get('bids/vendor')
   @Roles('VENDOR')
   async getVendorBids(@Request() req) {
-    return this.tenderService.getUserBids(req.user.id);
+    return this.tenderService.getVendorBids(req.user.id, req.user.orgId);
   }
 
   @Get(':id')
@@ -116,6 +116,7 @@ export class TenderController {
     return this.tenderService.getTenderById(id, {
       id: req.user.id,
       role: req.user.role,
+      orgId: req.user.orgId,
     });
   }
 
