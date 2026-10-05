@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Button } from './Button';
-import { FormField, Input, RadioGroup, TextArea } from './Form';
+import { FormField, Input, RadioGroup, TextArea } from './Form/index';
 
 interface EvaluationCriteria {
   id: string;
