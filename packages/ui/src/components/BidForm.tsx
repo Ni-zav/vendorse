@@ -39,6 +39,7 @@ async function uploadProposalFile(file: File): Promise<BidDocumentPayload> {
     body: JSON.stringify({
       fileName: file.name,
       contentType: file.type || 'application/octet-stream',
+      fileSize: file.size,
     }),
   });
 
