@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OrgType } from '@vendorse/shared';
@@ -9,10 +17,14 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() loginDto: { email: string; password: string }) {
-    if (!loginDto?.email || !loginDto?.password) {
+    if (!loginDto?.email?.trim() || !loginDto?.password) {
       throw new BadRequestException('Email and password are required');
     }
-    const user = await this.authService.validateUser(loginDto.email, loginDto.password);
+
+    const user = await this.authService.validateUser(
+      loginDto.email,
+      loginDto.password,
+    );
     return this.authService.login(user);
   }
 
@@ -29,7 +41,6 @@ export class AuthController {
         name: string;
         email: string;
         password: string;
-        role: string;
       };
     },
   ) {
@@ -39,7 +50,11 @@ export class AuthController {
 
     const { organization, user } = registerDto;
 
-    if (!organization.name || !organization.type || !organization.address) {
+    if (
+      !organization.name?.trim() ||
+      !organization.type ||
+      !organization.address?.trim()
+    ) {
       throw new BadRequestException('Missing required organization fields');
     }
 
@@ -47,23 +62,24 @@ export class AuthController {
       throw new BadRequestException('Invalid organization type');
     }
 
-    if (!user.email || !user.password || !user.name) {
+    if (!user.email?.trim() || !user.password || !user.name?.trim()) {
       throw new BadRequestException('Missing required user fields');
     }
 
-    const org = await this.authService.createOrganization(
-      organization.name,
-      organization.type,
-      organization.address
-    );
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email.trim())) {
+      throw new BadRequestException('Enter a valid email address');
+    }
 
-    return this.authService.register(
-      user.email,
-      user.password,
-      user.name,
-      org.id,
-      user.role
-    );
+    if (user.password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    return this.authService.registerVendor({
+      email: user.email,
+      password: user.password,
+      name: user.name,
+      organization,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
