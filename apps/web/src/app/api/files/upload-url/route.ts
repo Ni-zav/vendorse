@@ -18,14 +18,23 @@ export async function POST(req: NextRequest) {
       typeof body.contentType === 'string'
         ? body.contentType
         : 'application/octet-stream';
+    const fileSize =
+      typeof body.fileSize === 'number' && Number.isFinite(body.fileSize)
+        ? String(Math.trunc(body.fileSize))
+        : '';
 
     if (!fileName) {
       return Response.json({ error: 'fileName is required' }, { status: 400 });
     }
 
+    if (!fileSize || Number(fileSize) <= 0) {
+      return Response.json({ error: 'fileSize is required' }, { status: 400 });
+    }
+
     const query = new URLSearchParams({
       fileName,
       contentType,
+      fileSize,
     });
 
     const response = await fetch(
