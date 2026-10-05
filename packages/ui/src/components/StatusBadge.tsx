@@ -16,6 +16,9 @@ const statusStyles: Record<string, string> = {
   CANCELLED: 'border-red-200 bg-red-50 text-red-700',
   COMPLETED: 'border-slate-200 bg-slate-100 text-slate-700',
   WITHDRAWN: 'border-slate-200 bg-slate-100 text-slate-600',
+  ACTIVE: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  INACTIVE: 'border-slate-200 bg-slate-100 text-slate-600',
+  SUSPENDED: 'border-red-200 bg-red-50 text-red-700',
 };
 
 export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
