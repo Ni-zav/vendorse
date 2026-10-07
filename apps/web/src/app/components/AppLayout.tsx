@@ -23,12 +23,12 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
   {
-    name: 'Dashboard',
-    href: '/dashboard',
+    name: 'Procurement',
+    href: '/procurement',
     roles: ['ADMIN', 'BUYER', 'VENDOR', 'REVIEWER'],
   },
   {
-    name: 'Tenders',
+    name: 'Legacy tenders',
     href: '/tenders',
     roles: ['ADMIN', 'BUYER', 'VENDOR', 'REVIEWER'],
   },
@@ -79,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isActive = (href: string) =>
     pathname === href ||
-    (href !== '/dashboard' &&
+    (href !== '/procurement' &&
       href !== '/tenders' &&
       pathname.startsWith(href + '/')) ||
     (href === '/tenders' &&
@@ -97,7 +97,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
               <div className="flex min-w-0 flex-1 items-center">
                 <Link
-                  href={user ? '/dashboard' : '/'}
+                  href={user ? '/procurement' : '/'}
                   className="group flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-white shadow-sm">
