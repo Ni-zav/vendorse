@@ -39,6 +39,7 @@ model User {
   amendmentsCreated          EventAmendment[] @relation("AmendmentCreator")
   openingEvents              OpeningEvent[] @relation("OpeningEventActor")
   qualificationsReviewed     SupplierQualification[] @relation("QualificationReviewer")
+  performanceReviews          SupplierPerformanceReview[] @relation("PerformanceReviewer")
   fileObjects                 FileObject[] @relation("FileOwner")
 
   @@index([email])
@@ -70,6 +71,7 @@ model Organization {
   supplierQualifications SupplierQualification[]
   awards Award[]
   contracts Contract[]
+  performanceReviews SupplierPerformanceReview[]
 
   @@index([supplierStatus])
   @@map("organizations")
@@ -223,11 +225,25 @@ model SourcingEvent {
   responses      SourcingResponse[]
   openingEvents  OpeningEvent[]
   assignments    EvaluationAssignment[]
+  versions       SourcingEventVersion[]
   award          Award?
 
   @@index([projectId, status])
   @@index([closeAt, status])
   @@map("sourcing_events")
+}
+
+model SourcingEventVersion {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  version     Int
+  snapshot    Json
+  createdAt   DateTime @default(now())
+
+  @@unique([eventId, version])
+  @@index([eventId, createdAt])
+  @@map("sourcing_event_versions")
 }
 
 model EventCriterion {
@@ -516,12 +532,52 @@ model Contract {
   status          ContractStatus @default(DRAFT)
   signedDocumentKey String?
   executedAt      DateTime?
+  performanceReviews SupplierPerformanceReview[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([supplierOrgId, status])
   @@index([endDate, status])
   @@map("contracts")
+}
+
+model SupplierPerformanceReview {
+  id             String @id @default(cuid())
+  contract       Contract @relation(fields: [contractId], references: [id])
+  contractId     String
+  supplierOrg    Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId  String
+  reviewer       User @relation("PerformanceReviewer", fields: [reviewerId], references: [id])
+  reviewerId     String
+  periodStart    DateTime
+  periodEnd      DateTime
+  quality        Decimal @db.Decimal(5, 2)
+  delivery       Decimal @db.Decimal(5, 2)
+  responsiveness Decimal @db.Decimal(5, 2)
+  commercial     Decimal @db.Decimal(5, 2)
+  notes          String? @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([contractId, periodEnd])
+  @@index([supplierOrgId, periodEnd])
+  @@map("supplier_performance_reviews")
+}
+
+model OutboxEvent {
+  id            String @id @default(cuid())
+  topic         String
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@map("outbox_events")
 }
 
 model SupplierQualification {
@@ -740,6 +796,13 @@ enum QualificationStatus {
   CONDITIONALLY_QUALIFIED
   REJECTED
   EXPIRED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
 }
 
 enum NotificationType {
