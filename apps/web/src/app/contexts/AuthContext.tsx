@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(payload?.message || payload?.error || 'Invalid credentials');
       }
       await loadProfile();
-      router.replace('/dashboard');
+      router.replace('/procurement');
     },
     [loadProfile, router],
   );
