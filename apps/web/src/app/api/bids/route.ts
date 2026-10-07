@@ -6,7 +6,8 @@ export async function GET(
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
     
     console.log('[API Route Debug] Fetching bids:', {
       apiUrl,
