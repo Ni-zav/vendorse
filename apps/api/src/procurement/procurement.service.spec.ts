@@ -200,4 +200,105 @@ describe('ProcurementService domain invariants', () => {
       service.publishEvent(actor, 'event-1', '127.0.0.1'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('does not expose comparison before formal opening', async () => {
+    const service = serviceWith({
+      sourcingEvent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'event-1',
+          status: 'PUBLISHED',
+          project: { workspaceOrgId: actor.orgId, currency: 'IDR' },
+          criteria: [],
+          responses: [],
+        }),
+      },
+    });
+
+    await expect(service.getComparison(actor, 'event-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('computes weighted comparison only from submitted locked scorecards', async () => {
+    const service = serviceWith({
+      sourcingEvent: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'event-1',
+          title: 'Design services',
+          status: 'EVALUATING',
+          version: 1,
+          project: { workspaceOrgId: actor.orgId, currency: 'IDR' },
+          criteria: [
+            {
+              id: 'technical',
+              key: 'technical',
+              name: 'Technical',
+              weight: '60',
+              minScore: 0,
+              maxScore: 100,
+            },
+            {
+              id: 'commercial',
+              key: 'commercial',
+              name: 'Commercial',
+              weight: '40',
+              minScore: 0,
+              maxScore: 100,
+            },
+          ],
+          responses: [
+            {
+              id: 'response-1',
+              status: 'EVALUATED',
+              supplierOrg: { id: 'supplier-1', name: 'Supplier One' },
+              versions: [
+                {
+                  id: 'version-1',
+                  version: 1,
+                  receiptCode: 'VR-1',
+                  totalAmount: '1000000',
+                  currency: 'IDR',
+                  submittedAt: new Date(),
+                  lineItems: [],
+                },
+              ],
+              assignments: [
+                {
+                  status: 'SUBMITTED',
+                  conflictStatus: 'CLEAR',
+                  scorecard: {
+                    recommendation: 'ACCEPT',
+                    scores: [
+                      { criterionId: 'technical', score: '80' },
+                      { criterionId: 'commercial', score: '60' },
+                    ],
+                  },
+                },
+                {
+                  status: 'SUBMITTED',
+                  conflictStatus: 'CLEAR',
+                  scorecard: {
+                    recommendation: 'ACCEPT',
+                    scores: [
+                      { criterionId: 'technical', score: '100' },
+                      { criterionId: 'commercial', score: '80' },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      },
+    });
+
+    const comparison = await service.getComparison(actor, 'event-1');
+
+    expect(comparison.methodology.autoRanking).toBe(false);
+    expect(comparison.responses[0].evaluation.weightedScore).toBeCloseTo(82, 6);
+    expect(comparison.responses[0].evaluation.recommendationCounts).toEqual({
+      ACCEPT: 2,
+    });
+  });
+
 });
