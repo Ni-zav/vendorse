@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 export async function POST(req: NextRequest) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
 
     if (!authHeader) {
       return Response.json(
@@ -31,10 +32,16 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'fileSize is required' }, { status: 400 });
     }
 
+    const purpose =
+      typeof body.purpose === 'string' && body.purpose.trim()
+        ? body.purpose.trim()
+        : 'PROCUREMENT_DOCUMENT';
+
     const query = new URLSearchParams({
       fileName,
       contentType,
       fileSize,
+      purpose,
     });
 
     const response = await fetch(

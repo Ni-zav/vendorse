@@ -10,7 +10,8 @@ export async function GET(
     const searchParams = req.nextUrl.searchParams;
     const queryString = searchParams.toString();
     const path = queryString ? `?${queryString}` : '';
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
     
     if (!authHeader) {
       return Response.json(
@@ -52,7 +53,8 @@ export async function POST(
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
     const params = await context.params;
     const body = await req.json();
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
     
     if (!authHeader) {
       return Response.json(

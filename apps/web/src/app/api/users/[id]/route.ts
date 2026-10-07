@@ -6,12 +6,15 @@ export async function GET(
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
+    if (!authHeader) return Response.json({ error: 'Unauthenticated' }, { status: 401 });
     const params = await context.params;
     const { id } = params;
     
     const response = await fetch(`${apiUrl}/users/${id}`, {
       headers: {
-        ...Object.fromEntries(req.headers),
+        Authorization: authHeader,
         'host': 'localhost:3003'
       },
     });
@@ -39,6 +42,9 @@ export async function PUT(
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
+    if (!authHeader) return Response.json({ error: 'Unauthenticated' }, { status: 401 });
     const params = await context.params;
     const { id } = params;
     const body = await req.json();
@@ -46,7 +52,7 @@ export async function PUT(
     const response = await fetch(`${apiUrl}/users/${id}`, {
       method: 'PUT',
       headers: {
-        ...Object.fromEntries(req.headers),
+        Authorization: authHeader,
         'Content-Type': 'application/json',
         'host': 'localhost:3003'
       },

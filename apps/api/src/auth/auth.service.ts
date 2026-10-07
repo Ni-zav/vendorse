@@ -4,17 +4,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaClient } from '@vendorse/database';
+import { PrismaService } from '../database/prisma.service';
 import { OrgType } from '@vendorse/shared';
 import { compare, hash } from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  private prisma: PrismaClient;
-
-  constructor(private jwtService: JwtService) {
-    this.prisma = new PrismaClient();
-  }
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+  ) {}
 
   async validateUser(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -57,6 +56,11 @@ export class AuthService {
       name: string;
       type: OrgType;
       address: string;
+      legalName: string;
+      registrationNumber: string;
+      countryCode: string;
+      taxId?: string;
+      domain?: string;
     };
   }) {
     const email = data.email.trim().toLowerCase();
@@ -69,6 +73,23 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
+    const countryCode = data.organization.countryCode.trim().toUpperCase();
+    const registrationNumber = data.organization.registrationNumber.trim();
+    const existingOrganization = await this.prisma.organization.findUnique({
+      where: {
+        countryCode_registrationNumber: {
+          countryCode,
+          registrationNumber,
+        },
+      },
+      select: { id: true },
+    });
+    if (existingOrganization) {
+      throw new ConflictException(
+        'A supplier with this legal registration already exists. Ask its organization admin to invite you.',
+      );
+    }
+
     const hashedPassword = await hash(data.password, 12);
 
     const user = await this.prisma.$transaction(async (tx) => {
@@ -77,6 +98,12 @@ export class AuthService {
           name: data.organization.name.trim(),
           type: data.organization.type,
           address: data.organization.address.trim(),
+          legalName: data.organization.legalName.trim(),
+          registrationNumber,
+          countryCode,
+          taxId: data.organization.taxId?.trim() || null,
+          domain: data.organization.domain?.trim().toLowerCase() || null,
+          supplierStatus: 'PENDING_REVIEW',
         },
       });
 

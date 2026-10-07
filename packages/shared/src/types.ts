@@ -77,11 +77,55 @@ export interface Evaluation {
   updatedAt: Date;
 }
 
+export type ProcurementRequestStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'IN_SOURCING'
+  | 'CONTRACTED';
+
+export type SourcingEventStatus =
+  | 'DRAFT'
+  | 'PUBLISHED'
+  | 'CLOSED'
+  | 'OPENED'
+  | 'EVALUATING'
+  | 'AWARDED'
+  | 'CANCELLED';
+
+export interface ProcurementRequest {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  estimatedAmount: number | string;
+  currency: string;
+  desiredDate?: Date | string | null;
+  status: ProcurementRequestStatus;
+  submittedAt?: Date | string | null;
+  approvedAt?: Date | string | null;
+  project?: { id: string; status: string } | null;
+}
+
+export interface SourcingEventSummary {
+  id: string;
+  title: string;
+  type: 'RFI' | 'RFQ' | 'RFP' | 'TENDER' | 'BAFO';
+  status: SourcingEventStatus;
+  version: number;
+  closeAt: Date | string;
+  project: { id: string; title: string; workspaceOrgId: string; currency: string };
+  _count?: { invitations: number; responses: number; assignments: number };
+  award?: { id: string; status: string } | null;
+}
+
 export interface Tender {
   id: string;
   title: string;
   description: string;
-  budget: number;
+  budget: number | string;
+  currency?: string;
   deadline: Date;
   status: TenderStatus;
   createdById: string;

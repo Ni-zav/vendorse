@@ -36,6 +36,11 @@ export class AuthController {
         name: string;
         type: OrgType;
         address: string;
+        legalName: string;
+        registrationNumber: string;
+        countryCode: string;
+        taxId?: string;
+        domain?: string;
       };
       user: {
         name: string;
@@ -53,13 +58,20 @@ export class AuthController {
     if (
       !organization.name?.trim() ||
       !organization.type ||
-      !organization.address?.trim()
+      !organization.address?.trim() ||
+      !organization.legalName?.trim() ||
+      !organization.registrationNumber?.trim() ||
+      !organization.countryCode?.trim()
     ) {
       throw new BadRequestException('Missing required organization fields');
     }
 
     if (!['BUSINESS', 'GOVERNMENT', 'NON_PROFIT'].includes(organization.type)) {
       throw new BadRequestException('Invalid organization type');
+    }
+
+    if (!/^[A-Za-z]{2}$/.test(organization.countryCode.trim())) {
+      throw new BadRequestException('countryCode must be a 2-letter ISO country code');
     }
 
     if (!user.email?.trim() || !user.password || !user.name?.trim()) {

@@ -5,11 +5,16 @@ export const isValidRole = (role: unknown): role is UserRole => {
   return ['ADMIN', 'VENDOR', 'BUYER', 'REVIEWER'].includes(role as string);
 };
 
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (
+  amount: number | string,
+  currency = 'IDR',
+): string => {
+  const numeric = Number(amount);
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
-  }).format(amount);
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(numeric) ? numeric : 0);
 };
 
 export const formatDate = (date: Date): string => {

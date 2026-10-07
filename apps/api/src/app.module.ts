@@ -5,6 +5,8 @@ import { TenderModule } from './tender/tender.module';
 import { FileModule } from './file/file.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UsersModule } from './app/users/users.module';
+import { DatabaseModule } from './database/database.module';
+import { ProcurementModule } from './procurement/procurement.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -14,8 +16,10 @@ import { AppService } from './app.service';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    DatabaseModule,
     AuthModule,
     TenderModule,
+    ProcurementModule,
     FileModule,
     DashboardModule,
     UsersModule,

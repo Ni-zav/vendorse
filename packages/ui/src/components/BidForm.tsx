@@ -14,38 +14,28 @@ interface BidFormProps {
   isLoading?: boolean;
 }
 
-async function hashFile(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 async function uploadProposalFile(file: File): Promise<BidDocumentPayload> {
-  const token = localStorage.getItem('token');
-
-  if (!token) {
-    throw new Error('Your session has expired. Please sign in again.');
-  }
-
   const uploadUrlResponse = await fetch('/api/files/upload-url', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer ' + token,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       fileName: file.name,
       contentType: file.type || 'application/octet-stream',
       fileSize: file.size,
+      purpose: 'LEGACY_TENDER_PROPOSAL',
     }),
   });
 
   const uploadUrlPayload = await uploadUrlResponse.json();
 
-  if (!uploadUrlResponse.ok || !uploadUrlPayload?.url || !uploadUrlPayload?.fields?.key) {
+  if (
+    !uploadUrlResponse.ok ||
+    !uploadUrlPayload?.url ||
+    !uploadUrlPayload?.fields?.key ||
+    !uploadUrlPayload?.file?.id
+  ) {
     throw new Error(
       uploadUrlPayload?.message ||
         uploadUrlPayload?.error ||
@@ -65,9 +55,27 @@ async function uploadProposalFile(file: File): Promise<BidDocumentPayload> {
     throw new Error('A proposal document could not be uploaded.');
   }
 
+  const finalizeResponse = await fetch(
+    '/api/files/' + uploadUrlPayload.file.id + '/finalize',
+    { method: 'POST' },
+  );
+  const finalized = await finalizeResponse.json().catch(() => null);
+
+  if (
+    !finalizeResponse.ok ||
+    finalized?.verificationStatus !== 'VERIFIED' ||
+    !finalized?.sha256
+  ) {
+    throw new Error(
+      finalized?.message ||
+        finalized?.error ||
+        'The uploaded proposal document could not be verified.',
+    );
+  }
+
   return {
     filePath: uploadUrlPayload.fields.key,
-    signatureHash: await hashFile(file),
+    signatureHash: finalized.sha256,
   };
 }
 

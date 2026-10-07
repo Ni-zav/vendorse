@@ -1,5 +1,7 @@
 import {
   Controller,
+  Get,
+  Param,
   Post,
   Query,
   Request,
@@ -16,28 +18,39 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @Post('upload-url')
-  @Roles('VENDOR')
+  @Roles('VENDOR', 'BUYER', 'ADMIN')
   async getUploadUrl(
     @Query('fileName') fileName: string,
     @Query('contentType') contentType: string,
     @Query('fileSize') fileSize: string,
-    @Request() req,
+    @Query('purpose') purpose: string,
+    @Request() req: any,
   ) {
-    const upload = this.fileService.validateProposalUpload(
+    return this.fileService.createUploadIntent(
       fileName || '',
       contentType || '',
       Number(fileSize),
-    );
-
-    const key = this.fileService.generateFileKey(
-      upload.fileName,
       req.user.id,
+      purpose || 'PROCUREMENT_DOCUMENT',
     );
+  }
 
-    return this.fileService.generateUploadUrl(
-      key,
-      upload.contentType,
-      upload.fileSize,
+  @Post(':id/finalize')
+  @Roles('VENDOR', 'BUYER', 'ADMIN')
+  finalizeUpload(@Param('id') id: string, @Request() req: any) {
+    return this.fileService.finalizeUpload(id, req.user.id);
+  }
+
+  @Get(':id/download-url')
+  async getDownloadUrl(@Param('id') id: string, @Request() req: any) {
+    return this.fileService.generateAuthorizedDownloadUrl(
+      id,
+      {
+        id: req.user.id,
+        role: req.user.role,
+        orgId: req.user.orgId,
+      },
+      req.ip || '127.0.0.1',
     );
   }
 }

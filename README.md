@@ -1,128 +1,148 @@
 # Vendorse
 
-Vendorse is an **e-procurement / competitive-sourcing workbench** that is being evolved into an auditable **Source-to-Contract + procurement-orchestration platform**.
+Vendorse is an auditable **procurement orchestration + Source-to-Contract workspace** built as a Next.js/NestJS/PostgreSQL modular monolith.
 
-The current codebase is a strong prototype foundation, not yet a production-ready end-to-end procurement suite.
-
-## Current direction
-
-The canonical product/technical plan is:
-
-- [2026-10-08 vision package](./docs/20261008/README.md)
-- [End-to-end product and technical vision](./docs/20261008/product-and-technical-vision.md)
-- [Delivery plan](./docs/20261008/delivery-plan.md)
-- [Market / standards / Indonesia research](./docs/20261008/research-notes.md)
-- [2026-10-04 audit and refactor](./docs/20261004/audit-and-refactor.md)
-
-The target product journey is:
+The implemented primary journey is:
 
 ```text
 Procurement Request
+  -> Approval / sourcing triage
   -> Sourcing Project
-  -> Supplier Qualification
+  -> Supplier onboarding + qualification
   -> RFx / Tender
   -> Clarifications + Amendments
-  -> Sealed Submission
-  -> Opening
-  -> Evaluation
-  -> Approval
-  -> Award
+  -> Versioned sealed response + receipt
+  -> Authorized opening
+  -> Reviewer assignment + COI
+  -> Locked scorecards
+  -> Buyer comparison + decision package
+  -> Award recommendation + independent approval
   -> Contract
-  -> Supplier Performance / Renewal
-  -> ERP / P2P handoff
+  -> Supplier performance
+  -> ERP / P2P export
 ```
 
-Vendorse should own the upstream procurement decision process and integrate with downstream accounting/ERP/P2P systems rather than trying to replace them immediately.
+Vendorse owns the upstream procurement decision trail. It intentionally does not try to replace accounting, AP, treasury, inventory, or a full ERP.
 
-## Current implemented baseline
+## Product and architecture docs
 
-The current `main` baseline includes:
+The canonical product package is under [docs/20261008](./docs/20261008/README.md):
 
-### Identity and administration
+- [Product and technical vision](./docs/20261008/product-and-technical-vision.md)
+- [Delivery plan](./docs/20261008/delivery-plan.md)
+- [Implementation status](./docs/20261008/implementation-status.md)
+- [Research notes](./docs/20261008/research-notes.md)
 
-- user roles for ADMIN / BUYER / VENDOR / REVIEWER;
-- organization membership;
-- JWT authentication;
-- admin user-management surfaces;
-- user account status;
-- partial audit logging.
+The earlier code/product audit remains in [docs/20261004](./docs/20261004/README.md).
 
-### Tender / sourcing workbench
+## Implemented Source-to-Contract core
 
-- create draft tender;
-- publish tender;
-- list/search/filter tenders;
-- attach tender documents;
-- responsive buyer/vendor/reviewer screens.
+### Intake and work queues
 
-### Supplier response
+- requester-friendly procurement request records;
+- request submission and approval/rejection;
+- sourcing project creation with sourcing method;
+- role-aware `/procurement` workbench;
+- admin request and award approval queues;
+- operational procurement metrics.
 
-- vendor proposal submission;
-- proposal documents;
-- organization-level duplicate active-bid guard;
-- deadline enforcement.
+### Supplier lifecycle
 
-### Evaluation
+- stable supplier organization identity;
+- legal name, registration number, country, tax ID and domain;
+- duplicate legal-identity guard;
+- qualification status/history;
+- invitation to sourcing events;
+- contract-linked supplier performance reviews.
 
-- post-deadline reviewer access;
-- own-organization conflict guard;
-- score submission;
-- recommendation;
-- status transitions.
+### Sourcing
 
-### Award
+- first-class sourcing projects and events;
+- RFIs, RFQs, RFPs, tenders and BAFO events;
+- Decimal money + ISO currency;
+- persisted evaluation criteria and structured line items;
+- published event versions with immutable reconstructable snapshots;
+- governed clarifications;
+- explicit amendments/version history;
+- supplier participation tracking.
 
-- buyer/admin award action;
-- active bids must have an evaluation;
-- selected bid requires at least one ACCEPT recommendation;
-- winning/losing bid status updates;
-- award audit event.
+### Submission integrity
 
-### Platform
+- verified file-object lifecycle;
+- controlled object keys;
+- object existence / MIME / size verification;
+- server-computed SHA-256;
+- resource-aware document download authorization;
+- structured line-item pricing and response answers;
+- immutable response versions;
+- server timestamps and receipt codes;
+- superseding response versions instead of overwrite;
+- proposal data hidden from buyers/reviewers until explicit opening.
 
-- S3-compatible upload integration;
-- dashboard statistics;
-- in-app notification records;
-- pnpm/Turborepo monorepo;
-- GitHub Actions build + API unit tests.
+### Evaluation and decision
 
-## Important limitations
+- reviewer assignment;
+- conflict-of-interest declaration / recusal;
+- own-supplier-organization guard;
+- locked scorecards;
+- persisted criterion scores;
+- frozen evaluation-plan weights;
+- buyer comparison computed from locked scorecards;
+- no automatic supplier ranking;
+- reviewable/exportable decision package;
+- award recommendation;
+- independent administrator award approval.
 
-Do not infer production/legal compliance from the feature list above.
+### Contract and downstream handoff
 
-The current baseline still needs, among other things:
+- first-class award record;
+- first-class contract record;
+- contract execution state;
+- request/project completion linkage;
+- supplier performance history;
+- expiring-contract analytics;
+- versioned ERP/P2P JSON handoff payload.
 
-- committed database migrations;
-- fixed-point money + currency;
-- runtime request schemas;
-- production-grade browser sessions;
-- centralized resource authorization policies;
-- server-side file finalization/content verification;
-- resource-aware document downloads;
-- persisted/versioned evaluation criteria;
-- reviewer assignments;
-- conflict-of-interest declarations;
-- explicit bid opening;
-- immutable submission receipts/versions;
-- first-class scorecards;
-- first-class awards;
-- contracts;
-- procurement request/intake;
-- supplier lifecycle/qualification;
-- broader audit coverage;
-- browser E2E tests;
-- deployment/observability hardening.
+### Platform integrity
 
-See [delivery-plan.md](./docs/20261008/delivery-plan.md) for the required order.
+- committed Prisma migration history;
+- managed shared Prisma lifecycle;
+- HttpOnly SameSite browser session cookie;
+- fail-closed JWT configuration;
+- active/suspended-user enforcement;
+- strict runtime contracts for the new procurement mutation API;
+- centralized procurement authorization policy primitives;
+- append-oriented audit records for high-consequence procurement transitions;
+- transactional outbox records written with audited procurement transitions;
+- GitHub Actions schema validation, production builds, and API tests.
+
+The original `Tender` workflow remains temporarily available as a compatibility path while the primary navigation points to Source-to-Contract.
+
+## Deliberately later platform work
+
+These are not required to claim the first end-to-end Source-to-Contract journey, and are intentionally not faked in this release:
+
+- enterprise SSO / tenant-managed identity providers;
+- generic drag-and-drop workflow designer;
+- full supplier self-service membership administration;
+- webhook endpoint/delivery worker and email worker;
+- e-sign provider integration;
+- browser Playwright matrix;
+- full multi-tenant SaaS isolation/RLS architecture;
+- OpenTelemetry/error-monitoring production stack;
+- jurisdiction-specific public-procurement policy packs;
+- AI procurement assistants.
+
+See the delivery plan for their sequencing.
 
 ## Tech stack
 
-- **Frontend:** Next.js 15.3 + React 19 + TypeScript
-- **Backend:** NestJS 11 + TypeScript
-- **Database:** PostgreSQL + Prisma
+- **Web:** Next.js 15.3, React 19, TypeScript
+- **API:** NestJS 11, TypeScript
+- **Database:** PostgreSQL, Prisma 6.6
 - **Storage:** S3-compatible object storage
-- **Auth:** JWT-based current implementation
 - **Monorepo:** pnpm + Turborepo
+- **CI:** GitHub Actions
 
 ## Repository layout
 
@@ -132,102 +152,77 @@ apps/
   web/                 Next.js web app
 
 packages/
-  database/            Prisma/database package
+  database/            Prisma schema + migrations
   shared/              shared types/utilities
   ui/                  reusable UI components
 
 docs/
   20261004/            audit/refactor baseline
-  20261008/            canonical product + architecture vision
+  20261008/            product vision, delivery plan, implementation status
 ```
 
-Repository-wide coding/domain rules are in [AGENTS.md](./AGENTS.md).
+Repository-wide engineering/domain rules are in [AGENTS.md](./AGENTS.md).
 
 ## Local development
 
 ### Requirements
 
-- Node.js 22 recommended for parity with CI;
+- Node.js 22;
+- pnpm 10.9+;
 - PostgreSQL;
-- pnpm 10.9+.
+- S3-compatible object storage for document flows.
 
 ### Install
 
 ```bash
 pnpm install
-```
-
-### Configure
-
-Copy the root environment example and provide required local values.
-
-```bash
 cp .env.example .env
 ```
 
-Review the current app/package documentation for environment variables used by the API, database, and storage integration.
+Set at minimum a real `DATABASE_URL` and `JWT_SECRET`. Configure S3/MinIO values for upload flows.
 
 ### Database
 
-The current repository still uses the existing Prisma workflow.
+Generate the client:
 
 ```bash
 pnpm --filter @vendorse/database db:generate
 ```
 
-A committed migration history is a release blocker in the new delivery plan. Do not introduce new production schema evolution that relies only on `prisma db push`.
+Apply committed migrations:
 
-### Development
+```bash
+pnpm --filter @vendorse/database db:migrate:deploy
+```
+
+For local migration development:
+
+```bash
+pnpm --filter @vendorse/database db:migrate:dev
+```
+
+Production schema evolution must use committed migrations, not `prisma db push`.
+
+### Run
 
 ```bash
 pnpm dev:all
 ```
 
-### Build
+The API defaults to port 3003. The web app uses server-side API proxies and the HttpOnly session cookie for browser authentication.
+
+### Validate
 
 ```bash
+pnpm --filter @vendorse/database db:validate
 pnpm build
-```
-
-### API tests
-
-```bash
 pnpm --filter api test --runInBand
 ```
 
-## Product boundary
+The pull-request quality workflow runs these release checks automatically.
 
-Vendorse is being designed for:
+## Security / claims
 
-- procurement intake/orchestration;
-- supplier lifecycle;
-- sourcing / RFx;
-- sealed responses;
-- evaluation;
-- approval and award;
-- contract handoff/metadata;
-- audit and procurement analytics.
+Vendorse handles commercially sensitive supplier and proposal data. Treat confidentiality, opening rules, assignment, COI, file authorization, immutable submissions, and auditability as product invariants.
 
-It is **not** currently intended to become a general ledger, payment engine, inventory system, or full ERP.
-
-## Indonesia / government procurement note
-
-Vendorse should not be marketed as a replacement for Indonesian government procurement systems merely because it supports tenders.
-
-Government procurement currently uses official LKPP/INAPROC/SPSE/Katalog infrastructure and procedure-specific regulation. Any government-specific Vendorse capability must be separately scoped, researched, and implemented as jurisdiction-specific policy.
-
-## Security note
-
-Vendorse contains commercially sensitive procurement data.
-
-Security controls should be treated as product invariants, especially:
-
-- tenant/organization isolation;
-- proposal confidentiality;
-- controlled opening;
-- evaluator assignment/conflicts;
-- file authorization;
-- auditability;
-- immutable submitted records.
-
-Do not advertise certifications, legal compliance, cryptographic signatures, or other controls unless they are actually implemented and verified.
+Do not advertise regulatory certifications, legal compliance, cryptographic signatures, or jurisdiction-specific procurement compliance unless those controls have actually been implemented and independently verified.

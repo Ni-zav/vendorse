@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,13 +18,32 @@ model User {
   status        UserStatus   @default(ACTIVE)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
   bidsCreated   Bid[]        @relation("BidCreator")
   bidsReviewed  EvaluationScore[] @relation("BidReviewer")
   tendersCreated Tender[]     @relation("TenderCreator")
   notifications Notification[]
   auditLogs     AuditLog[]    @relation("AuditActor")
 
+  procurementRequestsCreated ProcurementRequest[] @relation("ProcurementRequestCreator")
+  sourcingProjectsOwned      SourcingProject[] @relation("SourcingProjectOwner")
+  sourcingEventsCreated      SourcingEvent[] @relation("SourcingEventCreator")
+  responseVersionsSubmitted  SourcingResponseVersion[] @relation("ResponseVersionSubmitter")
+  evaluationAssignments      EvaluationAssignment[] @relation("EvaluationAssignmentReviewer")
+  scorecards                 Scorecard[] @relation("ScorecardReviewer")
+  awardsRecommended          Award[] @relation("AwardRecommender")
+  awardsApproved             Award[] @relation("AwardApprover")
+  contractsOwned             Contract[] @relation("ContractOwner")
+  clarificationsAsked        Clarification[] @relation("ClarificationAsker")
+  clarificationsAnswered     Clarification[] @relation("ClarificationAnswerer")
+  amendmentsCreated          EventAmendment[] @relation("AmendmentCreator")
+  openingEvents              OpeningEvent[] @relation("OpeningEventActor")
+  qualificationsReviewed     SupplierQualification[] @relation("QualificationReviewer")
+  performanceReviews          SupplierPerformanceReview[] @relation("PerformanceReviewer")
+  fileObjects                 FileObject[] @relation("FileOwner")
+
   @@index([email])
+  @@index([orgId, role, status])
   @@map("users")
 }
 
@@ -40,11 +53,28 @@ model Organization {
   type        OrgType
   address     String
   verified    Boolean   @default(false)
+  legalName   String?
+  registrationNumber String?
+  taxId       String?
+  countryCode String?   @db.VarChar(2)
+  domain      String?
+  supplierStatus SupplierStatus @default(NOT_APPLICABLE)
   users       User[]
   bids        Bid[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  workspaceRequests ProcurementRequest[] @relation("ProcurementRequestWorkspace")
+  workspaceProjects SourcingProject[] @relation("SourcingProjectWorkspace")
+  supplierInvitations SupplierInvitation[]
+  sourcingResponses SourcingResponse[]
+  supplierQualifications SupplierQualification[]
+  awards Award[]
+  contracts Contract[]
+  performanceReviews SupplierPerformanceReview[]
+
+  @@index([supplierStatus])
+  @@unique([countryCode, registrationNumber])
   @@map("organizations")
 }
 
@@ -52,7 +82,8 @@ model Tender {
   id          String    @id @default(cuid())
   title       String
   description String    @db.Text
-  budget      Float
+  budget      Decimal   @db.Decimal(18, 2)
+  currency    String    @default("IDR") @db.VarChar(3)
   deadline    DateTime
   createdBy   User      @relation("TenderCreator", fields: [createdById], references: [id])
   createdById String
@@ -122,6 +153,451 @@ model EvaluationScore {
   @@map("evaluation_scores")
 }
 
+model ProcurementRequest {
+  id              String @id @default(cuid())
+  workspaceOrg    Organization @relation("ProcurementRequestWorkspace", fields: [workspaceOrgId], references: [id])
+  workspaceOrgId  String
+  createdBy       User @relation("ProcurementRequestCreator", fields: [createdById], references: [id])
+  createdById     String
+  title           String
+  description     String @db.Text
+  category        String
+  estimatedAmount Decimal @db.Decimal(18, 2)
+  currency        String @db.VarChar(3)
+  desiredDate     DateTime?
+  status          ProcurementRequestStatus @default(DRAFT)
+  decisionReason  String? @db.Text
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  project         SourcingProject?
+
+  @@index([workspaceOrgId, status])
+  @@index([createdById, status])
+  @@map("procurement_requests")
+}
+
+model SourcingProject {
+  id              String @id @default(cuid())
+  request         ProcurementRequest @relation(fields: [requestId], references: [id])
+  requestId       String @unique
+  workspaceOrg    Organization @relation("SourcingProjectWorkspace", fields: [workspaceOrgId], references: [id])
+  workspaceOrgId  String
+  owner           User @relation("SourcingProjectOwner", fields: [ownerId], references: [id])
+  ownerId         String
+  title           String
+  category        String
+  method          SourcingMethod
+  estimatedAmount Decimal @db.Decimal(18, 2)
+  currency        String @db.VarChar(3)
+  status          SourcingProjectStatus @default(DRAFT)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  events          SourcingEvent[]
+
+  @@index([workspaceOrgId, status])
+  @@map("sourcing_projects")
+}
+
+model SourcingEvent {
+  id          String @id @default(cuid())
+  project     SourcingProject @relation(fields: [projectId], references: [id])
+  projectId   String
+  createdBy   User @relation("SourcingEventCreator", fields: [createdById], references: [id])
+  createdById String
+  type        SourcingEventType
+  status      SourcingEventStatus @default(DRAFT)
+  title       String
+  instructions String @db.Text
+  version     Int @default(1)
+  openAt      DateTime?
+  closeAt     DateTime
+  publishedAt DateTime?
+  openedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  criteria       EventCriterion[]
+  lineItems      EventLineItem[]
+  invitations    SupplierInvitation[]
+  clarifications Clarification[]
+  amendments     EventAmendment[]
+  responses      SourcingResponse[]
+  openingEvents  OpeningEvent[]
+  assignments    EvaluationAssignment[]
+  versions       SourcingEventVersion[]
+  award          Award?
+
+  @@index([projectId, status])
+  @@index([closeAt, status])
+  @@map("sourcing_events")
+}
+
+model SourcingEventVersion {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  version     Int
+  snapshot    Json
+  createdAt   DateTime @default(now())
+
+  @@unique([eventId, version])
+  @@index([eventId, createdAt])
+  @@map("sourcing_event_versions")
+}
+
+model EventCriterion {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  key         String
+  name        String
+  description String? @db.Text
+  weight      Decimal @db.Decimal(5, 2)
+  minScore    Int @default(0)
+  maxScore    Int @default(100)
+  mandatory   Boolean @default(false)
+  sortOrder   Int @default(0)
+  scores      CriterionScore[]
+
+  @@unique([eventId, key])
+  @@index([eventId, sortOrder])
+  @@map("event_criteria")
+}
+
+model EventLineItem {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  code        String
+  description String @db.Text
+  quantity    Decimal @db.Decimal(18, 4)
+  unit        String
+  sortOrder   Int @default(0)
+  responseLines ResponseLineItem[]
+
+  @@unique([eventId, code])
+  @@index([eventId, sortOrder])
+  @@map("event_line_items")
+}
+
+model SupplierInvitation {
+  id            String @id @default(cuid())
+  event         SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId       String
+  supplierOrg   Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId String
+  status        SupplierInvitationStatus @default(INVITED)
+  invitedAt     DateTime @default(now())
+  respondedAt   DateTime?
+
+  @@unique([eventId, supplierOrgId])
+  @@index([supplierOrgId, status])
+  @@map("supplier_invitations")
+}
+
+model Clarification {
+  id           String @id @default(cuid())
+  event        SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId      String
+  askedBy      User @relation("ClarificationAsker", fields: [askedById], references: [id])
+  askedById    String
+  question     String @db.Text
+  answer       String? @db.Text
+  answeredBy   User? @relation("ClarificationAnswerer", fields: [answeredById], references: [id])
+  answeredById String?
+  visibility   ClarificationVisibility @default(SHARED_ANONYMIZED)
+  createdAt    DateTime @default(now())
+  answeredAt   DateTime?
+
+  @@index([eventId, createdAt])
+  @@map("clarifications")
+}
+
+model EventAmendment {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  version     Int
+  summary     String @db.Text
+  createdBy   User @relation("AmendmentCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([eventId, version])
+  @@map("event_amendments")
+}
+
+model SourcingResponse {
+  id            String @id @default(cuid())
+  event         SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId       String
+  supplierOrg   Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId String
+  status        SourcingResponseStatus @default(DRAFT)
+  currentVersion Int @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  versions      SourcingResponseVersion[]
+  assignments   EvaluationAssignment[]
+
+  @@unique([eventId, supplierOrgId])
+  @@index([eventId, status])
+  @@map("sourcing_responses")
+}
+
+model SourcingResponseVersion {
+  id            String @id @default(cuid())
+  response      SourcingResponse @relation(fields: [responseId], references: [id])
+  responseId    String
+  version       Int
+  eventVersion  Int
+  submittedBy   User @relation("ResponseVersionSubmitter", fields: [submittedById], references: [id])
+  submittedById String
+  totalAmount   Decimal @db.Decimal(18, 2)
+  currency      String @db.VarChar(3)
+  narrative     String? @db.Text
+  receiptCode   String @unique
+  submittedAt   DateTime @default(now())
+  lineItems     ResponseLineItem[]
+  answers       ResponseAnswer[]
+  documents     ResponseDocument[]
+  scorecards    Scorecard[]
+  award         Award?
+
+  @@unique([responseId, version])
+  @@index([responseId, submittedAt])
+  @@map("sourcing_response_versions")
+}
+
+model ResponseLineItem {
+  id              String @id @default(cuid())
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String
+  eventLineItem   EventLineItem @relation(fields: [eventLineItemId], references: [id])
+  eventLineItemId String
+  quantity        Decimal @db.Decimal(18, 4)
+  unitPrice       Decimal @db.Decimal(18, 2)
+  totalPrice      Decimal @db.Decimal(18, 2)
+  notes           String? @db.Text
+
+  @@unique([responseVersionId, eventLineItemId])
+  @@map("response_line_items")
+}
+
+model ResponseAnswer {
+  id              String @id @default(cuid())
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String
+  key             String
+  value           String @db.Text
+
+  @@unique([responseVersionId, key])
+  @@map("response_answers")
+}
+
+model FileObject {
+  id              String @id @default(cuid())
+  owner           User @relation("FileOwner", fields: [ownerId], references: [id])
+  ownerId         String
+  purpose         String
+  storageKey      String @unique
+  originalFileName String
+  contentType     String
+  sizeBytes       Int
+  sha256          String?
+  verificationStatus FileVerificationStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  verifiedAt      DateTime?
+  responseDocument ResponseDocument?
+
+  @@index([ownerId, verificationStatus])
+  @@map("file_objects")
+}
+
+model ResponseDocument {
+  id              String @id @default(cuid())
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String
+  fileObject      FileObject @relation(fields: [fileObjectId], references: [id])
+  fileObjectId    String @unique
+  createdAt       DateTime @default(now())
+
+  @@index([responseVersionId])
+  @@map("response_documents")
+}
+
+model OpeningEvent {
+  id        String @id @default(cuid())
+  event     SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId   String
+  openedBy  User @relation("OpeningEventActor", fields: [openedById], references: [id])
+  openedById String
+  procedure OpeningProcedure @default(MANUAL)
+  note      String? @db.Text
+  openedAt  DateTime @default(now())
+
+  @@index([eventId, openedAt])
+  @@map("opening_events")
+}
+
+model EvaluationAssignment {
+  id          String @id @default(cuid())
+  event       SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId     String
+  response    SourcingResponse @relation(fields: [responseId], references: [id])
+  responseId  String
+  reviewer    User @relation("EvaluationAssignmentReviewer", fields: [reviewerId], references: [id])
+  reviewerId  String
+  conflictStatus ConflictDeclarationStatus @default(PENDING)
+  conflictNote String? @db.Text
+  status      EvaluationAssignmentStatus @default(ASSIGNED)
+  assignedAt  DateTime @default(now())
+  declaredAt  DateTime?
+  scorecard   Scorecard?
+
+  @@unique([responseId, reviewerId])
+  @@index([reviewerId, status])
+  @@map("evaluation_assignments")
+}
+
+model Scorecard {
+  id              String @id @default(cuid())
+  assignment      EvaluationAssignment @relation(fields: [assignmentId], references: [id])
+  assignmentId    String @unique
+  reviewer        User @relation("ScorecardReviewer", fields: [reviewerId], references: [id])
+  reviewerId      String
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String
+  recommendation EvaluationRecommendation
+  rationale       String @db.Text
+  submittedAt     DateTime @default(now())
+  lockedAt        DateTime @default(now())
+  scores          CriterionScore[]
+
+  @@index([reviewerId, submittedAt])
+  @@map("scorecards")
+}
+
+model CriterionScore {
+  id          String @id @default(cuid())
+  scorecard   Scorecard @relation(fields: [scorecardId], references: [id])
+  scorecardId String
+  criterion   EventCriterion @relation(fields: [criterionId], references: [id])
+  criterionId String
+  score       Decimal @db.Decimal(10, 2)
+  notes       String? @db.Text
+
+  @@unique([scorecardId, criterionId])
+  @@map("criterion_scores")
+}
+
+model Award {
+  id              String @id @default(cuid())
+  event           SourcingEvent @relation(fields: [eventId], references: [id])
+  eventId         String @unique
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String @unique
+  supplierOrg     Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId   String
+  recommendedBy   User @relation("AwardRecommender", fields: [recommendedById], references: [id])
+  recommendedById String
+  approvedBy      User? @relation("AwardApprover", fields: [approvedById], references: [id])
+  approvedById    String?
+  amount          Decimal @db.Decimal(18, 2)
+  currency        String @db.VarChar(3)
+  rationale       String @db.Text
+  status          AwardStatus @default(PENDING_APPROVAL)
+  recommendedAt   DateTime @default(now())
+  approvedAt      DateTime?
+  contract        Contract?
+
+  @@index([supplierOrgId, status])
+  @@map("awards")
+}
+
+model Contract {
+  id              String @id @default(cuid())
+  award           Award @relation(fields: [awardId], references: [id])
+  awardId         String @unique
+  supplierOrg     Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId   String
+  owner           User @relation("ContractOwner", fields: [ownerId], references: [id])
+  ownerId         String
+  title           String
+  amount          Decimal @db.Decimal(18, 2)
+  currency        String @db.VarChar(3)
+  startDate       DateTime
+  endDate         DateTime
+  status          ContractStatus @default(DRAFT)
+  signedDocumentKey String?
+  executedAt      DateTime?
+  performanceReviews SupplierPerformanceReview[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([supplierOrgId, status])
+  @@index([endDate, status])
+  @@map("contracts")
+}
+
+model SupplierPerformanceReview {
+  id             String @id @default(cuid())
+  contract       Contract @relation(fields: [contractId], references: [id])
+  contractId     String
+  supplierOrg    Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId  String
+  reviewer       User @relation("PerformanceReviewer", fields: [reviewerId], references: [id])
+  reviewerId     String
+  periodStart    DateTime
+  periodEnd      DateTime
+  quality        Decimal @db.Decimal(5, 2)
+  delivery       Decimal @db.Decimal(5, 2)
+  responsiveness Decimal @db.Decimal(5, 2)
+  commercial     Decimal @db.Decimal(5, 2)
+  notes          String? @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([contractId, periodEnd])
+  @@index([supplierOrgId, periodEnd])
+  @@map("supplier_performance_reviews")
+}
+
+model OutboxEvent {
+  id            String @id @default(cuid())
+  topic         String
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@map("outbox_events")
+}
+
+model SupplierQualification {
+  id            String @id @default(cuid())
+  supplierOrg   Organization @relation(fields: [supplierOrgId], references: [id])
+  supplierOrgId String
+  status        QualificationStatus
+  scopeCategory String?
+  notes         String? @db.Text
+  expiresAt     DateTime?
+  reviewedBy    User @relation("QualificationReviewer", fields: [reviewedById], references: [id])
+  reviewedById  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([supplierOrgId, status, expiresAt])
+  @@map("supplier_qualifications")
+}
+
 model Notification {
   id          String    @id @default(cuid())
   user        User      @relation(fields: [userId], references: [id])
@@ -146,6 +622,7 @@ model AuditLog {
   timestamp   DateTime  @default(now())
 
   @@index([timestamp])
+  @@index([targetType, targetId, timestamp])
   @@map("audit_logs")
 }
 
@@ -168,6 +645,17 @@ enum OrgType {
   NON_PROFIT
 }
 
+enum SupplierStatus {
+  NOT_APPLICABLE
+  PROSPECT
+  PENDING_REVIEW
+  QUALIFIED
+  CONDITIONALLY_QUALIFIED
+  SUSPENDED
+  DISQUALIFIED
+  ARCHIVED
+}
+
 enum TenderStatus {
   DRAFT
   PUBLISHED
@@ -186,10 +674,146 @@ enum BidStatus {
   WITHDRAWN
 }
 
+enum ProcurementRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  IN_SOURCING
+  CONTRACTED
+}
+
+enum SourcingProjectStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SourcingMethod {
+  DIRECT
+  RFQ
+  RFP
+  OPEN_TENDER
+  SELECTIVE_TENDER
+}
+
+enum SourcingEventType {
+  RFI
+  RFQ
+  RFP
+  TENDER
+  BAFO
+}
+
+enum SourcingEventStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  OPENED
+  EVALUATING
+  AWARDED
+  CANCELLED
+}
+
+enum SupplierInvitationStatus {
+  INVITED
+  VIEWED
+  RESPONDED
+  DECLINED
+}
+
+enum ClarificationVisibility {
+  PRIVATE
+  SHARED_ANONYMIZED
+  PUBLIC
+}
+
+enum SourcingResponseStatus {
+  DRAFT
+  SUBMITTED
+  SUPERSEDED
+  WITHDRAWN
+  OPENED
+  DISQUALIFIED
+  EVALUATED
+}
+
+enum FileVerificationStatus {
+  PENDING
+  VERIFIED
+  QUARANTINED
+  REJECTED
+}
+
+enum OpeningProcedure {
+  AUTOMATIC
+  MANUAL
+  DUAL_CONTROL
+}
+
+enum ConflictDeclarationStatus {
+  PENDING
+  CLEAR
+  CONFLICT
+}
+
+enum EvaluationAssignmentStatus {
+  ASSIGNED
+  BLOCKED
+  READY
+  SUBMITTED
+  RECUSED
+}
+
+enum EvaluationRecommendation {
+  ACCEPT
+  REJECT
+  REQUEST_CLARIFICATION
+}
+
+enum AwardStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  REVERSED
+}
+
+enum ContractStatus {
+  DRAFT
+  INTERNAL_REVIEW
+  APPROVED
+  SENT_FOR_SIGNATURE
+  EXECUTED
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  TERMINATED
+}
+
+enum QualificationStatus {
+  PENDING
+  QUALIFIED
+  CONDITIONALLY_QUALIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
 enum NotificationType {
   TENDER_PUBLISHED
   BID_SUBMITTED
   BID_EVALUATED
   TENDER_AWARDED
+  PROCUREMENT_REQUEST
+  EVALUATION_ASSIGNED
+  AWARD_APPROVAL
+  CONTRACT_CREATED
   SYSTEM_NOTIFICATION
 }

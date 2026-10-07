@@ -6,7 +6,8 @@ interface TenderCardProps {
   id: string;
   title: string;
   description: string;
-  budget: number;
+  budget: number | string;
+  currency?: string;
   deadline: string | Date;
   status: string;
   createdBy: {
@@ -23,6 +24,7 @@ export function TenderCard({
   title,
   description,
   budget,
+  currency,
   deadline,
   status,
   createdBy,
@@ -63,7 +65,7 @@ export function TenderCard({
         <div>
           <dt className="text-xs font-medium text-slate-500">Budget ceiling</dt>
           <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
-            {formatCurrency(budget)}
+            {formatCurrency(budget, currency)}
           </dd>
         </div>
         <div>

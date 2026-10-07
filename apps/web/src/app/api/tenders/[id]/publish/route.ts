@@ -7,7 +7,8 @@ export async function PUT(
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
     const { id } = await context.params;
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
 
     if (!authHeader) {
       return Response.json(
