@@ -194,9 +194,7 @@ export class ProcurementService {
   async submitRequest(actor: Actor, id: string, ipAddress: string) {
     const request = await this.prisma.procurementRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Procurement request not found');
-    if (request.createdById !== actor.id && actor.role !== 'ADMIN') {
-      throw new ForbiddenException('Only the request owner can submit this request');
-    }
+    ProcurementPolicy.requireOwnerOrAdmin(actor, request.createdById);
     if (request.status !== 'DRAFT') {
       throw new ConflictException('Only draft requests can be submitted');
     }
@@ -539,7 +537,7 @@ export class ProcurementService {
     const invitation = await this.prisma.supplierInvitation.findUnique({
       where: { eventId_supplierOrgId: { eventId, supplierOrgId: actor.orgId } },
     });
-    if (!invitation) throw new ForbiddenException('Your organization was not invited to this event');
+    ProcurementPolicy.requireInvitedSupplier(actor, invitation);
     if (!question?.trim()) throw new BadRequestException('question is required');
     return this.prisma.$transaction(async (tx) => {
       const clarification = await tx.clarification.create({
@@ -637,7 +635,7 @@ export class ProcurementService {
       }),
       this.prisma.organization.findUnique({ where: { id: actor.orgId } }),
     ]);
-    if (!invitation) throw new ForbiddenException('Your organization was not invited');
+    ProcurementPolicy.requireInvitedSupplier(actor, invitation);
     if (!supplier || !['QUALIFIED', 'CONDITIONALLY_QUALIFIED'].includes(supplier.supplierStatus)) {
       throw new ForbiddenException('Supplier qualification is required before submission');
     }
@@ -814,7 +812,7 @@ export class ProcurementService {
       include: { response: true },
     });
     if (!assignment) throw new NotFoundException('Evaluation assignment not found');
-    if (assignment.reviewerId !== actor.id) throw new ForbiddenException('This assignment belongs to another reviewer');
+    ProcurementPolicy.requireReviewerAssignment(actor, assignment);
     if (actor.orgId === assignment.response.supplierOrgId) {
       throw new ConflictException('Reviewer belongs to the supplier organization');
     }
@@ -860,7 +858,7 @@ export class ProcurementService {
       },
     });
     if (!assignment) throw new NotFoundException('Evaluation assignment not found');
-    if (assignment.reviewerId !== actor.id) throw new ForbiddenException();
+    ProcurementPolicy.requireReviewerAssignment(actor, assignment);
     if (assignment.conflictStatus !== 'CLEAR' || assignment.status !== 'READY') {
       throw new ConflictException('A clear conflict declaration is required before scoring');
     }
@@ -1154,8 +1152,10 @@ export class ProcurementService {
       ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
     }
     if (actor.role === 'VENDOR') {
-      const invited = event.invitations.some((i) => i.supplierOrgId === actor.orgId);
-      if (!invited) throw new ForbiddenException('Your organization is not invited to this event');
+      const invitation = event.invitations.find(
+        (item) => item.supplierOrgId === actor.orgId,
+      ) || null;
+      ProcurementPolicy.requireInvitedSupplier(actor, invitation);
       return {
         ...event,
         invitations: [],
