@@ -24,6 +24,7 @@ export default function ProcurementWorkspacePage() {
   const [events, setEvents] = useState<AnyRecord[]>([]);
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [suppliers, setSuppliers] = useState<AnyRecord[]>([]);
+  const [methodByRequest, setMethodByRequest] = useState<Record<string, string>>({});
   const [analytics, setAnalytics] = useState<AnyRecord | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -265,15 +266,42 @@ export default function ProcurementWorkspacePage() {
                       </Button>
                     )}
                     {request.status === 'APPROVED' && !request.project && (
-                      <Button
-                        onClick={() => act('source-' + request.id, async () => {
-                          const project = await post('requests/' + request.id + '/source', { method: 'RFP' });
-                          router.push('/procurement/projects/' + project.id + '/events/new');
-                        })}
-                        isLoading={busy === 'source-' + request.id}
-                      >
-                        Start RFP sourcing
-                      </Button>
+                      <div className="flex min-w-full flex-col gap-2 sm:min-w-0 sm:flex-row">
+                        <select
+                          value={methodByRequest[request.id] || 'RFP'}
+                          onChange={(event) =>
+                            setMethodByRequest((current) => ({
+                              ...current,
+                              [request.id]: event.target.value,
+                            }))
+                          }
+                          className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800"
+                          aria-label={'Sourcing method for ' + request.title}
+                        >
+                          <option value="RFQ">RFQ</option>
+                          <option value="RFP">RFP</option>
+                          <option value="OPEN_TENDER">Open tender</option>
+                          <option value="SELECTIVE_TENDER">Selective tender</option>
+                        </select>
+                        <Button
+                          onClick={() =>
+                            act('source-' + request.id, async () => {
+                              const project = await post(
+                                'requests/' + request.id + '/source',
+                                { method: methodByRequest[request.id] || 'RFP' },
+                              );
+                              router.push(
+                                '/procurement/projects/' +
+                                  project.id +
+                                  '/events/new',
+                              );
+                            })
+                          }
+                          isLoading={busy === 'source-' + request.id}
+                        >
+                          Start sourcing
+                        </Button>
+                      </div>
                     )}
                     {request.project?.id && (
                       <Button
