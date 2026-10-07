@@ -39,6 +39,7 @@ model User {
   amendmentsCreated          EventAmendment[] @relation("AmendmentCreator")
   openingEvents              OpeningEvent[] @relation("OpeningEventActor")
   qualificationsReviewed     SupplierQualification[] @relation("QualificationReviewer")
+  fileObjects                 FileObject[] @relation("FileOwner")
 
   @@index([email])
   @@index([orgId, role, status])
@@ -379,16 +380,31 @@ model ResponseAnswer {
   @@map("response_answers")
 }
 
-model ResponseDocument {
+model FileObject {
   id              String @id @default(cuid())
-  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
-  responseVersionId String
-  storageKey      String
+  owner           User @relation("FileOwner", fields: [ownerId], references: [id])
+  ownerId         String
+  purpose         String
+  storageKey      String @unique
   originalFileName String
   contentType     String
   sizeBytes       Int
   sha256          String
-  verificationStatus FileVerificationStatus @default(VERIFIED)
+  verificationStatus FileVerificationStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  verifiedAt      DateTime?
+  responseDocument ResponseDocument?
+
+  @@index([ownerId, verificationStatus])
+  @@map("file_objects")
+}
+
+model ResponseDocument {
+  id              String @id @default(cuid())
+  responseVersion SourcingResponseVersion @relation(fields: [responseVersionId], references: [id])
+  responseVersionId String
+  fileObject      FileObject @relation(fields: [fileObjectId], references: [id])
+  fileObjectId    String @unique
   createdAt       DateTime @default(now())
 
   @@index([responseVersionId])
