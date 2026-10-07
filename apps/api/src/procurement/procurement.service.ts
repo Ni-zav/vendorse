@@ -1147,7 +1147,19 @@ export class ProcurementService {
           select: { id: true, version: true, createdAt: true },
           orderBy: { version: 'asc' },
         },
-        award: { include: { contract: true, supplierOrg: { select: { id: true, name: true } } } },
+        award: {
+          include: {
+            contract: {
+              include: {
+                performanceReviews: {
+                  include: { reviewer: { select: { id: true, name: true } } },
+                  orderBy: { periodEnd: 'desc' },
+                },
+              },
+            },
+            supplierOrg: { select: { id: true, name: true } },
+          },
+        },
       },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
