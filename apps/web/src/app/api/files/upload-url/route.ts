@@ -32,10 +32,16 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'fileSize is required' }, { status: 400 });
     }
 
+    const purpose =
+      typeof body.purpose === 'string' && body.purpose.trim()
+        ? body.purpose.trim()
+        : 'PROCUREMENT_DOCUMENT';
+
     const query = new URLSearchParams({
       fileName,
       contentType,
       fileSize,
+      purpose,
     });
 
     const response = await fetch(
