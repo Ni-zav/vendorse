@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, FormField, Input, TextArea } from '@vendorse/ui';
-import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { ProtectedRoute } from '../../../components/ProtectedRoute';
 
 export default function NewProcurementRequestPage() {
   const router = useRouter();
