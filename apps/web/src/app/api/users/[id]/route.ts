@@ -42,6 +42,9 @@ export async function PUT(
 ) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
+    if (!authHeader) return Response.json({ error: 'Unauthenticated' }, { status: 401 });
     const params = await context.params;
     const { id } = params;
     const body = await req.json();
