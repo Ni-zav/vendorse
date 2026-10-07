@@ -116,6 +116,24 @@ export class ProcurementController {
     return this.procurement.listEvents(this.actor(req));
   }
 
+  @Get('events/:id/comparison')
+  @Roles('ADMIN', 'BUYER')
+  getComparison(
+    @Request() req: any,
+    @Param('id') id: string,
+  ): Promise<unknown> {
+    return this.procurement.getComparison(this.actor(req), id);
+  }
+
+  @Get('events/:id/decision-package')
+  @Roles('ADMIN', 'BUYER')
+  getDecisionPackage(
+    @Request() req: any,
+    @Param('id') id: string,
+  ): Promise<unknown> {
+    return this.procurement.getDecisionPackage(this.actor(req), id);
+  }
+
   @Get('events/:id')
   getEvent(@Request() req: any, @Param('id') id: string): Promise<unknown> {
     return this.procurement.getEvent(this.actor(req), id);
