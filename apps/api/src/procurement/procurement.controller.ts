@@ -261,10 +261,52 @@ export class ProcurementController {
     return this.procurement.listReviewers();
   }
 
+  @Get('analytics')
+  @Roles('ADMIN', 'BUYER')
+  analytics(@Request() req: any): Promise<unknown> {
+    return this.procurement.analytics(this.actor(req));
+  }
+
+  @Get('contracts/:id/export')
+  @Roles('ADMIN', 'BUYER')
+  exportContract(@Request() req: any, @Param('id') id: string): Promise<unknown> {
+    return this.procurement.exportContract(this.actor(req), id);
+  }
+
+  @Post('contracts/:id/performance')
+  @Roles('ADMIN', 'BUYER')
+  createPerformanceReview(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ): Promise<unknown> {
+    return this.procurement.createPerformanceReview(
+      this.actor(req),
+      id,
+      body,
+      this.ip(req),
+    );
+  }
+
+  @Get('integrations/outbox')
+  @Roles('ADMIN')
+  listOutbox(@Request() req: any): Promise<unknown> {
+    return this.procurement.listOutbox(this.actor(req));
+  }
+
   @Get('suppliers')
   @Roles('ADMIN', 'BUYER')
   listSuppliers(): Promise<unknown> {
     return this.procurement.listSuppliers();
+  }
+
+  @Get('suppliers/:id')
+  @Roles('ADMIN', 'BUYER')
+  getSupplierProfile(
+    @Request() req: any,
+    @Param('id') id: string,
+  ): Promise<unknown> {
+    return this.procurement.getSupplierProfile(this.actor(req), id);
   }
 
   @Post('suppliers/:id/qualifications')
