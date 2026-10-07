@@ -1209,6 +1209,288 @@ export class ProcurementService {
     return event;
   }
 
+  async createPerformanceReview(
+    actor: Actor,
+    contractId: string,
+    data: {
+      periodStart: string | Date;
+      periodEnd: string | Date;
+      quality: number;
+      delivery: number;
+      responsiveness: number;
+      commercial: number;
+      notes?: string;
+    },
+    ipAddress: string,
+  ) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id: contractId },
+      include: { award: { include: { event: { include: { project: true } } } } },
+    });
+    if (!contract) throw new NotFoundException('Contract not found');
+    this.assertWorkspace(actor, contract.award.event.project.workspaceOrgId);
+    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+
+    const periodStart = new Date(data.periodStart);
+    const periodEnd = new Date(data.periodEnd);
+    if (
+      Number.isNaN(periodStart.getTime()) ||
+      Number.isNaN(periodEnd.getTime()) ||
+      periodEnd <= periodStart
+    ) {
+      throw new BadRequestException('A valid performance review period is required');
+    }
+
+    const ratings = ['quality', 'delivery', 'responsiveness', 'commercial'] as const;
+    for (const rating of ratings) {
+      const value = Number(data[rating]);
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        throw new BadRequestException(rating + ' must be between 0 and 100');
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const review = await tx.supplierPerformanceReview.create({
+        data: {
+          contractId,
+          supplierOrgId: contract.supplierOrgId,
+          reviewerId: actor.id,
+          periodStart,
+          periodEnd,
+          quality: new Prisma.Decimal(String(data.quality)),
+          delivery: new Prisma.Decimal(String(data.delivery)),
+          responsiveness: new Prisma.Decimal(String(data.responsiveness)),
+          commercial: new Prisma.Decimal(String(data.commercial)),
+          notes: data.notes?.trim() || null,
+        },
+      });
+      await this.audit(tx, actor.id, 'SUPPLIER_PERFORMANCE_REVIEWED', review.id, 'SUPPLIER_PERFORMANCE_REVIEW', ipAddress);
+      return review;
+    });
+  }
+
+  async getSupplierProfile(actor: Actor, supplierOrgId: string) {
+    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    const supplier = await this.prisma.organization.findUnique({
+      where: { id: supplierOrgId },
+      include: {
+        supplierQualifications: {
+          include: { reviewedBy: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+        performanceReviews: {
+          include: {
+            reviewer: { select: { id: true, name: true } },
+            contract: { select: { id: true, title: true, startDate: true, endDate: true, status: true } },
+          },
+          orderBy: { periodEnd: 'desc' },
+        },
+        contracts: {
+          select: {
+            id: true,
+            title: true,
+            amount: true,
+            currency: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+          },
+          orderBy: { endDate: 'desc' },
+        },
+      },
+    });
+    if (!supplier || supplier.supplierStatus === 'NOT_APPLICABLE') {
+      throw new NotFoundException('Supplier not found');
+    }
+    return supplier;
+  }
+
+  async analytics(actor: Actor) {
+    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    const workspace = actor.role === 'ADMIN' ? undefined : actor.orgId;
+    const requestWhere = workspace ? { workspaceOrgId: workspace } : {};
+    const eventWhere = workspace ? { project: { workspaceOrgId: workspace } } : {};
+    const assignmentWhere = workspace
+      ? { event: { project: { workspaceOrgId: workspace } } }
+      : {};
+    const contractWhere = workspace
+      ? { award: { event: { project: { workspaceOrgId: workspace } } } }
+      : {};
+
+    const now = new Date();
+    const next90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const [
+      requestGroups,
+      eventGroups,
+      invitations,
+      respondedInvitations,
+      totalAssignments,
+      completedAssignments,
+      expiringContracts,
+      contractedRequests,
+    ] = await Promise.all([
+      this.prisma.procurementRequest.groupBy({
+        by: ['status'],
+        where: requestWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.sourcingEvent.groupBy({
+        by: ['status'],
+        where: eventWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.supplierInvitation.count({
+        where: workspace ? { event: eventWhere } : {},
+      }),
+      this.prisma.supplierInvitation.count({
+        where: {
+          ...(workspace ? { event: eventWhere } : {}),
+          status: 'RESPONDED',
+        },
+      }),
+      this.prisma.evaluationAssignment.count({ where: assignmentWhere }),
+      this.prisma.evaluationAssignment.count({
+        where: { ...assignmentWhere, status: 'SUBMITTED' },
+      }),
+      this.prisma.contract.findMany({
+        where: {
+          ...contractWhere,
+          status: { in: ['EXECUTED', 'ACTIVE', 'EXPIRING'] },
+          endDate: { gte: now, lte: next90 },
+        },
+        select: {
+          id: true,
+          title: true,
+          endDate: true,
+          supplierOrg: { select: { id: true, name: true } },
+        },
+        orderBy: { endDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.procurementRequest.findMany({
+        where: { ...requestWhere, status: 'CONTRACTED', submittedAt: { not: null } },
+        select: {
+          submittedAt: true,
+          project: {
+            select: {
+              events: {
+                where: { award: { contract: { isNot: null } } },
+                select: {
+                  award: {
+                    select: { contract: { select: { executedAt: true, createdAt: true } } },
+                  },
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const cycleDays = contractedRequests
+      .map((request) => {
+        const submitted = request.submittedAt?.getTime();
+        const contract = request.project?.events?.[0]?.award?.contract;
+        const finished = (contract?.executedAt || contract?.createdAt)?.getTime();
+        return submitted && finished ? (finished - submitted) / (24 * 60 * 60 * 1000) : null;
+      })
+      .filter((value): value is number => value !== null && value >= 0);
+
+    return {
+      requestsByStatus: Object.fromEntries(
+        requestGroups.map((row) => [row.status, row._count._all]),
+      ),
+      eventsByStatus: Object.fromEntries(
+        eventGroups.map((row) => [row.status, row._count._all]),
+      ),
+      supplierResponseRate:
+        invitations > 0 ? respondedInvitations / invitations : null,
+      evaluationCompletionRate:
+        totalAssignments > 0 ? completedAssignments / totalAssignments : null,
+      averageRequestToContractDays:
+        cycleDays.length > 0
+          ? cycleDays.reduce((sum, value) => sum + value, 0) / cycleDays.length
+          : null,
+      expiringContracts,
+    };
+  }
+
+  async exportContract(actor: Actor, contractId: string) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        supplierOrg: true,
+        award: {
+          include: {
+            responseVersion: {
+              include: {
+                lineItems: { include: { eventLineItem: true } },
+              },
+            },
+            event: {
+              include: {
+                project: { include: { request: true, workspaceOrg: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!contract) throw new NotFoundException('Contract not found');
+    this.assertWorkspace(actor, contract.award.event.project.workspaceOrgId);
+    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+
+    return {
+      schemaVersion: 'vendorse.contract-handoff.v1',
+      exportedAt: new Date().toISOString(),
+      contract: {
+        id: contract.id,
+        title: contract.title,
+        status: contract.status,
+        amount: contract.amount.toString(),
+        currency: contract.currency,
+        startDate: contract.startDate.toISOString(),
+        endDate: contract.endDate.toISOString(),
+        executedAt: contract.executedAt?.toISOString() || null,
+      },
+      buyer: {
+        organizationId: contract.award.event.project.workspaceOrg.id,
+        organizationName: contract.award.event.project.workspaceOrg.name,
+        requestId: contract.award.event.project.request.id,
+        projectId: contract.award.event.project.id,
+        eventId: contract.award.event.id,
+        awardId: contract.award.id,
+      },
+      supplier: {
+        organizationId: contract.supplierOrg.id,
+        name: contract.supplierOrg.name,
+        legalName: contract.supplierOrg.legalName,
+        registrationNumber: contract.supplierOrg.registrationNumber,
+        taxId: contract.supplierOrg.taxId,
+        countryCode: contract.supplierOrg.countryCode,
+      },
+      lines: contract.award.responseVersion.lineItems.map((line) => ({
+        code: line.eventLineItem.code,
+        description: line.eventLineItem.description,
+        quantity: line.quantity.toString(),
+        unit: line.eventLineItem.unit,
+        unitPrice: line.unitPrice.toString(),
+        totalPrice: line.totalPrice.toString(),
+        currency: contract.currency,
+      })),
+    };
+  }
+
+  async listOutbox(actor: Actor) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException();
+    return this.prisma.outboxEvent.findMany({
+      where: { status: { in: ['PENDING', 'FAILED'] } },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+  }
+
   async myWork(actor: Actor) {
     if (actor.role === 'REVIEWER') {
       return {
