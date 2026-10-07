@@ -58,7 +58,7 @@ export class ProcurementService {
     }
   }
 
-  private audit(
+  private async audit(
     tx: Prisma.TransactionClient,
     actorId: string,
     actionType: string,
@@ -66,9 +66,80 @@ export class ProcurementService {
     targetType: string,
     ipAddress: string,
   ) {
-    return tx.auditLog.create({
+    await tx.auditLog.create({
       data: { actorId, actionType, targetId, targetType, ipAddress },
     });
+    await tx.outboxEvent.create({
+      data: {
+        topic: actionType.toLowerCase().replaceAll('_', '.'),
+        aggregateType: targetType,
+        aggregateId: targetId,
+        payload: {
+          actorId,
+          actionType,
+          targetId,
+          targetType,
+        },
+      },
+    });
+  }
+
+  private eventSnapshot(event: {
+    id: string;
+    title: string;
+    instructions: string;
+    type: string;
+    version: number;
+    openAt: Date | null;
+    closeAt: Date;
+    criteria: Array<{
+      id: string;
+      key: string;
+      name: string;
+      description: string | null;
+      weight: Prisma.Decimal;
+      minScore: number;
+      maxScore: number;
+      mandatory: boolean;
+      sortOrder: number;
+    }>;
+    lineItems: Array<{
+      id: string;
+      code: string;
+      description: string;
+      quantity: Prisma.Decimal;
+      unit: string;
+      sortOrder: number;
+    }>;
+  }) {
+    return {
+      eventId: event.id,
+      version: event.version,
+      type: event.type,
+      title: event.title,
+      instructions: event.instructions,
+      openAt: event.openAt?.toISOString() || null,
+      closeAt: event.closeAt.toISOString(),
+      criteria: event.criteria.map((criterion) => ({
+        id: criterion.id,
+        key: criterion.key,
+        name: criterion.name,
+        description: criterion.description,
+        weight: criterion.weight.toString(),
+        minScore: criterion.minScore,
+        maxScore: criterion.maxScore,
+        mandatory: criterion.mandatory,
+        sortOrder: criterion.sortOrder,
+      })),
+      lineItems: event.lineItems.map((item) => ({
+        id: item.id,
+        code: item.code,
+        description: item.description,
+        quantity: item.quantity.toString(),
+        unit: item.unit,
+        sortOrder: item.sortOrder,
+      })),
+    };
   }
 
   async listRequests(actor: Actor) {
@@ -341,7 +412,7 @@ export class ProcurementService {
   async publishEvent(actor: Actor, eventId: string, ipAddress: string) {
     const event = await this.prisma.sourcingEvent.findUnique({
       where: { id: eventId },
-      include: { project: true, criteria: true },
+      include: { project: true, criteria: true, lineItems: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
     this.assertWorkspace(actor, event.project.workspaceOrgId);
@@ -353,10 +424,18 @@ export class ProcurementService {
       throw new ConflictException('Published events require a frozen 100% evaluation plan');
     }
     return this.prisma.$transaction(async (tx) => {
+      const publishedAt = new Date();
       const updated = await tx.sourcingEvent.update({
         where: { id: eventId },
-        data: { status: 'PUBLISHED', publishedAt: new Date() },
+        data: { status: 'PUBLISHED', publishedAt },
         include: { criteria: true, lineItems: true },
+      });
+      await tx.sourcingEventVersion.create({
+        data: {
+          eventId,
+          version: updated.version,
+          snapshot: this.eventSnapshot(updated),
+        },
       });
       await this.audit(tx, actor.id, 'SOURCING_EVENT_PUBLISHED', eventId, 'SOURCING_EVENT', ipAddress);
       return updated;
@@ -512,7 +591,7 @@ export class ProcurementService {
   ) {
     const event = await this.prisma.sourcingEvent.findUnique({
       where: { id: eventId },
-      include: { project: true },
+      include: { project: true, criteria: true, lineItems: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
     this.assertWorkspace(actor, event.project.workspaceOrgId);
@@ -528,9 +607,17 @@ export class ProcurementService {
       const amendment = await tx.eventAmendment.create({
         data: { eventId, version: nextVersion, summary: data.summary.trim(), createdById: actor.id },
       });
-      await tx.sourcingEvent.update({
+      const updatedEvent = await tx.sourcingEvent.update({
         where: { id: eventId },
         data: { version: nextVersion, closeAt },
+        include: { criteria: true, lineItems: true },
+      });
+      await tx.sourcingEventVersion.create({
+        data: {
+          eventId,
+          version: nextVersion,
+          snapshot: this.eventSnapshot(updatedEvent),
+        },
       });
       await this.audit(tx, actor.id, 'SOURCING_EVENT_AMENDED', amendment.id, 'EVENT_AMENDMENT', ipAddress);
       return amendment;
@@ -1056,6 +1143,10 @@ export class ProcurementService {
           },
         },
         openingEvents: true,
+        versions: {
+          select: { id: true, version: true, createdAt: true },
+          orderBy: { version: 'asc' },
+        },
         award: { include: { contract: true, supplierOrg: { select: { id: true, name: true } } } },
       },
     });
