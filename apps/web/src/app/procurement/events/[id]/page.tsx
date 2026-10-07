@@ -743,19 +743,72 @@ export default function ProcurementEventRoomPage() {
                       </div>
                       <Badge value={event.award.contract.status} />
                     </div>
-                    {!['EXECUTED', 'ACTIVE'].includes(event.award.contract.status) && (
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <Button
-                        className="mt-4"
-                        onClick={() =>
-                          act('execute-contract', async () => {
-                            const signedDocumentKey = window.prompt('Signed contract storage key');
-                            if (!signedDocumentKey) return;
-                            await post('contracts/' + event.award.contract.id + '/execute', { signedDocumentKey });
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/procurement/contracts/' + event.award.contract.id + '/export');
+                            const payload = await response.json().catch(() => null);
+                            if (!response.ok) throw new Error(payload?.message || payload?.error || 'Could not export contract');
+                            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const anchor = document.createElement('a');
+                            anchor.href = url;
+                            anchor.download = 'vendorse-contract-' + event.award.contract.id + '.json';
+                            anchor.click();
+                            URL.revokeObjectURL(url);
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : 'Could not export contract');
+                          }
+                        }}
+                      >
+                        Export ERP/P2P handoff
+                      </Button>
+                      {!['EXECUTED', 'ACTIVE'].includes(event.award.contract.status) && (
+                        <Button
+                          onClick={() =>
+                            act('execute-contract', async () => {
+                              const signedDocumentKey = window.prompt('Signed contract storage key');
+                              if (!signedDocumentKey) return;
+                              await post('contracts/' + event.award.contract.id + '/execute', { signedDocumentKey });
+                            })
+                          }
+                        >
+                          Mark executed
+                        </Button>
+                      )}
+                    </div>
+
+                    {['EXECUTED', 'ACTIVE'].includes(event.award.contract.status) && (
+                      <PerformanceForm
+                        contract={event.award.contract}
+                        busy={busy === 'performance'}
+                        onSubmit={(data) =>
+                          act('performance', async () => {
+                            await post('contracts/' + event.award.contract.id + '/performance', data);
                           })
                         }
-                      >
-                        Mark executed
-                      </Button>
+                      />
+                    )}
+
+                    {!!event.award.contract.performanceReviews?.length && (
+                      <div className="mt-5 border-t border-emerald-200 pt-4">
+                        <p className="text-sm font-bold text-emerald-950">Performance history</p>
+                        <div className="mt-3 space-y-2">
+                          {event.award.contract.performanceReviews.map((review: AnyRecord) => (
+                            <div key={review.id} className="rounded-lg bg-white/70 px-3 py-3 text-xs text-emerald-950">
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 font-semibold">
+                                <span>Quality {Number(review.quality)}/100</span>
+                                <span>Delivery {Number(review.delivery)}/100</span>
+                                <span>Responsiveness {Number(review.responsiveness)}/100</span>
+                                <span>Commercial {Number(review.commercial)}/100</span>
+                              </div>
+                              {review.notes && <p className="mt-2 leading-5 text-emerald-900/80">{review.notes}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -899,6 +952,59 @@ function ContractForm({
         onClick={() => onCreate({ title, startDate, endDate })}
       >
         Create contract
+      </Button>
+    </div>
+  );
+}
+
+function PerformanceForm({
+  contract,
+  busy,
+  onSubmit,
+}: {
+  contract: AnyRecord;
+  busy: boolean;
+  onSubmit: (data: AnyRecord) => Promise<void>;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [periodStart, setPeriodStart] = useState(
+    new Date(contract.startDate).toISOString().slice(0, 10),
+  );
+  const [periodEnd, setPeriodEnd] = useState(today);
+  const [quality, setQuality] = useState('80');
+  const [delivery, setDelivery] = useState('80');
+  const [responsiveness, setResponsiveness] = useState('80');
+  const [commercial, setCommercial] = useState('80');
+  const [notes, setNotes] = useState('');
+
+  return (
+    <div className="mt-5 border-t border-emerald-200 pt-5">
+      <p className="text-sm font-bold text-emerald-950">Record supplier performance</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+        <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+        <Input type="number" min="0" max="100" value={quality} onChange={(e) => setQuality(e.target.value)} placeholder="Quality" />
+        <Input type="number" min="0" max="100" value={delivery} onChange={(e) => setDelivery(e.target.value)} placeholder="Delivery" />
+        <Input type="number" min="0" max="100" value={responsiveness} onChange={(e) => setResponsiveness(e.target.value)} placeholder="Responsiveness" />
+        <Input type="number" min="0" max="100" value={commercial} onChange={(e) => setCommercial(e.target.value)} placeholder="Commercial" />
+      </div>
+      <TextArea className="mt-3" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Evidence, incidents, SLA observations, or remediation actions" />
+      <Button
+        className="mt-3"
+        isLoading={busy}
+        onClick={() =>
+          onSubmit({
+            periodStart,
+            periodEnd,
+            quality: Number(quality),
+            delivery: Number(delivery),
+            responsiveness: Number(responsiveness),
+            commercial: Number(commercial),
+            notes,
+          })
+        }
+      >
+        Save performance review
       </Button>
     </div>
   );
