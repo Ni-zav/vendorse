@@ -635,7 +635,8 @@ export class ProcurementService {
       }),
       this.prisma.organization.findUnique({ where: { id: actor.orgId } }),
     ]);
-    ProcurementPolicy.requireInvitedSupplier(actor, invitation);
+    const authorizedInvitation =
+      ProcurementPolicy.requireInvitedSupplier(actor, invitation);
     if (!supplier || !['QUALIFIED', 'CONDITIONALLY_QUALIFIED'].includes(supplier.supplierStatus)) {
       throw new ForbiddenException('Supplier qualification is required before submission');
     }
@@ -726,7 +727,7 @@ export class ProcurementService {
         data: { currentVersion: nextVersion, status: 'SUBMITTED' },
       });
       await tx.supplierInvitation.update({
-        where: { id: invitation.id },
+        where: { id: authorizedInvitation.id },
         data: { status: 'RESPONDED', respondedAt: new Date() },
       });
       await this.audit(tx, actor.id, 'SOURCING_RESPONSE_SUBMITTED', version.id, 'SOURCING_RESPONSE_VERSION', ipAddress);
