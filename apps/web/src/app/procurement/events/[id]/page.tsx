@@ -208,6 +208,7 @@ export default function ProcurementEventRoomPage() {
   const [event, setEvent] = useState<AnyRecord | null>(null);
   const [suppliers, setSuppliers] = useState<AnyRecord[]>([]);
   const [reviewers, setReviewers] = useState<AnyRecord[]>([]);
+  const [comparison, setComparison] = useState<AnyRecord | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedReviewer, setSelectedReviewer] = useState<Record<string, string>>({});
   const [clarification, setClarification] = useState('');
@@ -240,6 +241,20 @@ export default function ProcurementEventRoomPage() {
         ]);
         if (supplierResponse.ok) setSuppliers(await supplierResponse.json());
         if (reviewerResponse.ok) setReviewers(await reviewerResponse.json());
+
+        if (['OPENED', 'EVALUATING', 'AWARDED'].includes(eventPayload.status)) {
+          const comparisonResponse = await fetch(
+            '/api/procurement/events/' + id + '/comparison',
+            { cache: 'no-store' },
+          );
+          if (comparisonResponse.ok) {
+            setComparison(await comparisonResponse.json());
+          } else {
+            setComparison(null);
+          }
+        } else {
+          setComparison(null);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Event could not be loaded');
@@ -599,6 +614,107 @@ export default function ProcurementEventRoomPage() {
                     </div>
                   );
                 })}
+              </Section>
+            )}
+
+            {isBuyer && comparison && (
+              <Section eyebrow="Decision support" title="Supplier comparison">
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-xs leading-5 text-blue-950">
+                  Vendorse calculates weighted scores from the frozen published criteria and locked evaluator scorecards. It does not auto-rank or select a supplier.
+                </div>
+
+                <div className="mt-4 overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="py-3 pr-4">Supplier</th>
+                        <th className="py-3 pr-4">Commercial offer</th>
+                        <th className="py-3 pr-4">Weighted score</th>
+                        <th className="py-3 pr-4">Evaluation</th>
+                        <th className="py-3">Recommendations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(comparison.responses || []).map((response: AnyRecord) => (
+                        <tr key={response.responseId} className="border-b border-slate-100 align-top">
+                          <td className="py-4 pr-4 font-bold text-slate-950">
+                            {response.supplier?.name}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-700">
+                            {response.currentVersion
+                              ? formatCurrency(
+                                  response.currentVersion.totalAmount,
+                                  response.currentVersion.currency,
+                                )
+                              : '—'}
+                          </td>
+                          <td className="py-4 pr-4">
+                            {response.evaluation?.weightedScore == null ? (
+                              <span className="text-slate-400">Incomplete</span>
+                            ) : (
+                              <span className="font-black text-slate-950">
+                                {Number(response.evaluation.weightedScore).toFixed(2)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-700">
+                            {response.evaluation?.submitted || 0}/{response.evaluation?.assigned || 0} submitted
+                            {(response.evaluation?.recusedOrConflict || 0) > 0 && (
+                              <span className="ml-2 text-amber-700">
+                                · {response.evaluation.recusedOrConflict} recused/conflict
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 text-slate-700">
+                            {Object.entries(response.evaluation?.recommendationCounts || {})
+                              .map(([key, value]) => key.replaceAll('_', ' ') + ' ' + value)
+                              .join(' · ') || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(
+                          '/api/procurement/events/' + id + '/decision-package',
+                          { cache: 'no-store' },
+                        );
+                        const payload = await response.json().catch(() => null);
+                        if (!response.ok) {
+                          throw new Error(
+                            payload?.message ||
+                              payload?.error ||
+                              'Could not generate decision package',
+                          );
+                        }
+                        const blob = new Blob(
+                          [JSON.stringify(payload, null, 2)],
+                          { type: 'application/json' },
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const anchor = document.createElement('a');
+                        anchor.href = url;
+                        anchor.download = 'vendorse-decision-package-' + id + '.json';
+                        anchor.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        setError(
+                          e instanceof Error
+                            ? e.message
+                            : 'Could not generate decision package',
+                        );
+                      }
+                    }}
+                  >
+                    Export decision package
+                  </Button>
+                </div>
               </Section>
             )}
 
