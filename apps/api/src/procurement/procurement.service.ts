@@ -1207,6 +1207,260 @@ export class ProcurementService {
     return event;
   }
 
+  async getComparison(actor: Actor, eventId: string) {
+    ProcurementPolicy.requireProcurement(actor);
+    const event = await this.prisma.sourcingEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        project: true,
+        criteria: { orderBy: { sortOrder: 'asc' } },
+        responses: {
+          include: {
+            supplierOrg: { select: { id: true, name: true } },
+            versions: {
+              orderBy: { version: 'desc' },
+              take: 1,
+              include: {
+                lineItems: { include: { eventLineItem: true } },
+              },
+            },
+            assignments: {
+              include: {
+                scorecard: {
+                  include: { scores: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!event) throw new NotFoundException('Sourcing event not found');
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    if (!['OPENED', 'EVALUATING', 'AWARDED'].includes(event.status)) {
+      throw new ConflictException(
+        'Comparison is available only after responses are formally opened',
+      );
+    }
+
+    const responses = event.responses.map((response) => {
+      const version = response.versions[0] || null;
+      const submittedAssignments = response.assignments.filter(
+        (assignment) => assignment.status === 'SUBMITTED' && assignment.scorecard,
+      );
+      const conflicts = response.assignments.filter(
+        (assignment) =>
+          assignment.conflictStatus === 'CONFLICT' ||
+          assignment.status === 'RECUSED',
+      ).length;
+
+      const criterionScores = event.criteria.map((criterion) => {
+        const rawScores = submittedAssignments
+          .map((assignment) =>
+            assignment.scorecard?.scores.find(
+              (score) => score.criterionId === criterion.id,
+            ),
+          )
+          .filter((score): score is NonNullable<typeof score> => Boolean(score))
+          .map((score) => Number(score.score));
+        const average =
+          rawScores.length > 0
+            ? rawScores.reduce((sum, score) => sum + score, 0) / rawScores.length
+            : null;
+        const range = criterion.maxScore - criterion.minScore;
+        const normalized =
+          average === null || range <= 0
+            ? null
+            : Math.max(
+                0,
+                Math.min(
+                  100,
+                  ((average - criterion.minScore) / range) * 100,
+                ),
+              );
+        const weight = Number(criterion.weight);
+        return {
+          criterionId: criterion.id,
+          key: criterion.key,
+          name: criterion.name,
+          weight,
+          averageScore: average,
+          normalizedScore: normalized,
+          weightedContribution:
+            normalized === null ? null : (normalized * weight) / 100,
+          evaluatorCount: rawScores.length,
+        };
+      });
+
+      const completeCriterionScores = criterionScores.filter(
+        (criterion) => criterion.weightedContribution !== null,
+      );
+      const totalWeightedScore =
+        completeCriterionScores.length === event.criteria.length
+          ? completeCriterionScores.reduce(
+              (sum, criterion) =>
+                sum + Number(criterion.weightedContribution),
+              0,
+            )
+          : null;
+
+      const recommendationCounts = submittedAssignments.reduce<
+        Record<string, number>
+      >((counts, assignment) => {
+        const recommendation = assignment.scorecard?.recommendation;
+        if (recommendation) {
+          counts[recommendation] = (counts[recommendation] || 0) + 1;
+        }
+        return counts;
+      }, {});
+
+      return {
+        responseId: response.id,
+        supplier: response.supplierOrg,
+        responseStatus: response.status,
+        currentVersion: version
+          ? {
+              id: version.id,
+              version: version.version,
+              receiptCode: version.receiptCode,
+              totalAmount: version.totalAmount.toString(),
+              currency: version.currency,
+              submittedAt: version.submittedAt,
+              lineItems: version.lineItems.map((line) => ({
+                eventLineItemId: line.eventLineItemId,
+                code: line.eventLineItem.code,
+                description: line.eventLineItem.description,
+                quantity: line.quantity.toString(),
+                unit: line.eventLineItem.unit,
+                unitPrice: line.unitPrice.toString(),
+                totalPrice: line.totalPrice.toString(),
+              })),
+            }
+          : null,
+        evaluation: {
+          assigned: response.assignments.length,
+          submitted: submittedAssignments.length,
+          recusedOrConflict: conflicts,
+          complete:
+            response.assignments.length > 0 &&
+            response.assignments.every(
+              (assignment) =>
+                assignment.status === 'SUBMITTED' ||
+                assignment.status === 'RECUSED',
+            ),
+          recommendationCounts,
+          criteria: criterionScores,
+          weightedScore: totalWeightedScore,
+        },
+      };
+    });
+
+    return {
+      event: {
+        id: event.id,
+        title: event.title,
+        status: event.status,
+        version: event.version,
+        currency: event.project.currency,
+      },
+      methodology: {
+        description:
+          'Weighted score is the sum of normalized criterion averages multiplied by the frozen published criterion weights. Missing evaluator scores produce no aggregate score.',
+        autoRanking: false,
+      },
+      responses,
+    };
+  }
+
+  async getDecisionPackage(actor: Actor, eventId: string) {
+    const comparison = await this.getComparison(actor, eventId);
+    const event = await this.prisma.sourcingEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        project: { include: { request: true } },
+        invitations: {
+          include: {
+            supplierOrg: { select: { id: true, name: true } },
+          },
+        },
+        openingEvents: { orderBy: { openedAt: 'asc' } },
+        award: {
+          include: {
+            supplierOrg: { select: { id: true, name: true } },
+            contract: true,
+          },
+        },
+      },
+    });
+    if (!event) throw new NotFoundException('Sourcing event not found');
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+
+    const incomplete = comparison.responses.filter(
+      (response) => !response.evaluation.complete,
+    );
+    const conflicts = comparison.responses.filter(
+      (response) => response.evaluation.recusedOrConflict > 0,
+    );
+    const submittedSupplierIds = new Set(
+      comparison.responses.map((response) => response.supplier.id),
+    );
+
+    return {
+      schemaVersion: 'vendorse.decision-package.v1',
+      generatedAt: new Date().toISOString(),
+      request: {
+        id: event.project.request.id,
+        title: event.project.request.title,
+        category: event.project.request.category,
+        estimatedAmount: event.project.request.estimatedAmount.toString(),
+        currency: event.project.request.currency,
+      },
+      sourcing: {
+        projectId: event.project.id,
+        projectTitle: event.project.title,
+        eventId: event.id,
+        eventTitle: event.title,
+        method: event.project.method,
+        eventType: event.type,
+        eventVersion: event.version,
+        openedAt: event.openingEvents[0]?.openedAt || null,
+      },
+      participants: event.invitations.map((invitation) => ({
+        supplier: invitation.supplierOrg,
+        invitationStatus: invitation.status,
+        submitted: submittedSupplierIds.has(invitation.supplierOrgId),
+      })),
+      comparison,
+      exceptions: {
+        incompleteEvaluationResponseIds: incomplete.map(
+          (response) => response.responseId,
+        ),
+        responsesWithReviewerConflictOrRecusal: conflicts.map(
+          (response) => response.responseId,
+        ),
+      },
+      recommendation: event.award
+        ? {
+            awardId: event.award.id,
+            status: event.award.status,
+            supplier: event.award.supplierOrg,
+            amount: event.award.amount.toString(),
+            currency: event.award.currency,
+            rationale: event.award.rationale,
+          }
+        : null,
+      contract: event.award?.contract
+        ? {
+            id: event.award.contract.id,
+            title: event.award.contract.title,
+            status: event.award.contract.status,
+            startDate: event.award.contract.startDate,
+            endDate: event.award.contract.endDate,
+          }
+        : null,
+    };
+  }
+
   async createPerformanceReview(
     actor: Actor,
     contractId: string,
