@@ -59,11 +59,11 @@ export default function RegisterPage() {
         );
       }
 
-      if (!result?.accessToken) {
+      if (!result?.ok) {
         throw new Error('Registration succeeded but no session was returned.');
       }
 
-      localStorage.setItem('token', result.accessToken);
+      localStorage.setItem('token', 'cookie-session');
       router.push('/dashboard');
     } catch (registrationError) {
       setError(
