@@ -36,6 +36,14 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @vendorse/database db:generate
 
+      - name: Validate Prisma schema
+        run: pnpm --filter @vendorse/database exec prisma validate --schema prisma/schema.prisma
+
+      - name: Render baseline migration SQL
+        run: |
+          pnpm --filter @vendorse/database exec prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/vendorse-baseline.sql
+          cat /tmp/vendorse-baseline.sql
+
       - name: Build workspace
         run: pnpm build
 
