@@ -11,6 +11,27 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ProcurementService } from './procurement.service';
+import {
+  parseAmendment,
+  parseAwardDecision,
+  parseAwardRecommendation,
+  parseClarification,
+  parseClarificationAnswer,
+  parseConflictDeclaration,
+  parseCreateContract,
+  parseCreateEvent,
+  parseCreateProject,
+  parseCreateRequest,
+  parseExecuteContract,
+  parseOpening,
+  parsePerformanceReview,
+  parseQualification,
+  parseRequestDecision,
+  parseResponse,
+  parseReviewerAssignment,
+  parseScorecard,
+  parseSupplierInvitation,
+} from './procurement.contracts';
 
 @Controller('procurement')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -42,8 +63,8 @@ export class ProcurementController {
 
   @Post('requests')
   @Roles('ADMIN', 'BUYER')
-  createRequest(@Request() req: any, @Body() body: any): Promise<unknown> {
-    return this.procurement.createRequest(this.actor(req), body, this.ip(req));
+  createRequest(@Request() req: any, @Body() body: unknown): Promise<unknown> {
+    return this.procurement.createRequest(this.actor(req), parseCreateRequest(body), this.ip(req));
   }
 
   @Post('requests/:id/submit')
@@ -57,13 +78,14 @@ export class ProcurementController {
   decideRequest(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { approved: boolean; reason?: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseRequestDecision(body);
     return this.procurement.decideRequest(
       this.actor(req),
       id,
-      Boolean(body.approved),
-      body.reason || '',
+      input.approved,
+      input.reason || '',
       this.ip(req),
     );
   }
@@ -73,15 +95,20 @@ export class ProcurementController {
   createProject(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { method: string; title?: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
-    return this.procurement.createProject(this.actor(req), id, body, this.ip(req));
+    return this.procurement.createProject(
+      this.actor(req),
+      id,
+      parseCreateProject(body),
+      this.ip(req),
+    );
   }
 
   @Post('projects/:id/events')
   @Roles('ADMIN', 'BUYER')
-  createEvent(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
-    return this.procurement.createEvent(this.actor(req), id, body, this.ip(req));
+  createEvent(@Request() req: any, @Param('id') id: string, @Body() body: unknown): Promise<unknown> {
+    return this.procurement.createEvent(this.actor(req), id, parseCreateEvent(body), this.ip(req));
   }
 
   @Get('events')
@@ -105,12 +132,13 @@ export class ProcurementController {
   inviteSupplier(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { supplierOrgId: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseSupplierInvitation(body);
     return this.procurement.inviteSupplier(
       this.actor(req),
       id,
-      body.supplierOrgId,
+      input.supplierOrgId,
       this.ip(req),
     );
   }
@@ -120,12 +148,13 @@ export class ProcurementController {
   askClarification(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { question: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseClarification(body);
     return this.procurement.askClarification(
       this.actor(req),
       id,
-      body.question,
+      input.question,
       this.ip(req),
     );
   }
@@ -135,26 +164,27 @@ export class ProcurementController {
   answerClarification(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { answer: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseClarificationAnswer(body);
     return this.procurement.answerClarification(
       this.actor(req),
       id,
-      body.answer,
+      input.answer,
       this.ip(req),
     );
   }
 
   @Post('events/:id/amendments')
   @Roles('ADMIN', 'BUYER')
-  amendEvent(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
-    return this.procurement.amendEvent(this.actor(req), id, body, this.ip(req));
+  amendEvent(@Request() req: any, @Param('id') id: string, @Body() body: unknown): Promise<unknown> {
+    return this.procurement.amendEvent(this.actor(req), id, parseAmendment(body), this.ip(req));
   }
 
   @Post('events/:id/responses')
   @Roles('VENDOR')
-  submitResponse(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
-    return this.procurement.submitResponse(this.actor(req), id, body, this.ip(req));
+  submitResponse(@Request() req: any, @Param('id') id: string, @Body() body: unknown): Promise<unknown> {
+    return this.procurement.submitResponse(this.actor(req), id, parseResponse(body), this.ip(req));
   }
 
   @Post('events/:id/open')
@@ -162,9 +192,10 @@ export class ProcurementController {
   openEvent(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { note?: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
-    return this.procurement.openEvent(this.actor(req), id, body?.note, this.ip(req));
+    const input = parseOpening(body);
+    return this.procurement.openEvent(this.actor(req), id, input.note, this.ip(req));
   }
 
   @Post('events/:id/assignments')
@@ -172,13 +203,14 @@ export class ProcurementController {
   assignReviewer(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { responseId: string; reviewerId: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseReviewerAssignment(body);
     return this.procurement.assignReviewer(
       this.actor(req),
       id,
-      body.responseId,
-      body.reviewerId,
+      input.responseId,
+      input.reviewerId,
       this.ip(req),
     );
   }
@@ -188,9 +220,14 @@ export class ProcurementController {
   declareConflict(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { conflict: boolean; note?: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
-    return this.procurement.declareConflict(this.actor(req), id, body, this.ip(req));
+    return this.procurement.declareConflict(
+      this.actor(req),
+      id,
+      parseConflictDeclaration(body),
+      this.ip(req),
+    );
   }
 
   @Post('assignments/:id/scorecard')
@@ -198,9 +235,14 @@ export class ProcurementController {
   submitScorecard(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: unknown,
   ): Promise<unknown> {
-    return this.procurement.submitScorecard(this.actor(req), id, body, this.ip(req));
+    return this.procurement.submitScorecard(
+      this.actor(req),
+      id,
+      parseScorecard(body),
+      this.ip(req),
+    );
   }
 
   @Post('events/:id/award')
@@ -208,13 +250,14 @@ export class ProcurementController {
   recommendAward(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { responseId: string; rationale: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseAwardRecommendation(body);
     return this.procurement.recommendAward(
       this.actor(req),
       id,
-      body.responseId,
-      body.rationale,
+      input.responseId,
+      input.rationale,
       this.ip(req),
     );
   }
@@ -224,20 +267,21 @@ export class ProcurementController {
   decideAward(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { approved: boolean },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseAwardDecision(body);
     return this.procurement.approveAward(
       this.actor(req),
       id,
-      Boolean(body.approved),
+      input.approved,
       this.ip(req),
     );
   }
 
   @Post('awards/:id/contract')
   @Roles('ADMIN', 'BUYER')
-  createContract(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
-    return this.procurement.createContract(this.actor(req), id, body, this.ip(req));
+  createContract(@Request() req: any, @Param('id') id: string, @Body() body: unknown): Promise<unknown> {
+    return this.procurement.createContract(this.actor(req), id, parseCreateContract(body), this.ip(req));
   }
 
   @Post('contracts/:id/execute')
@@ -245,12 +289,13 @@ export class ProcurementController {
   executeContract(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { signedDocumentKey: string },
+    @Body() body: unknown,
   ): Promise<unknown> {
+    const input = parseExecuteContract(body);
     return this.procurement.executeContract(
       this.actor(req),
       id,
-      body.signedDocumentKey,
+      input.signedDocumentKey,
       this.ip(req),
     );
   }
@@ -278,12 +323,12 @@ export class ProcurementController {
   createPerformanceReview(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: unknown,
   ): Promise<unknown> {
     return this.procurement.createPerformanceReview(
       this.actor(req),
       id,
-      body,
+      parsePerformanceReview(body),
       this.ip(req),
     );
   }
@@ -314,8 +359,13 @@ export class ProcurementController {
   qualifySupplier(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: unknown,
   ): Promise<unknown> {
-    return this.procurement.qualifySupplier(this.actor(req), id, body, this.ip(req));
+    return this.procurement.qualifySupplier(
+      this.actor(req),
+      id,
+      parseQualification(body),
+      this.ip(req),
+    );
   }
 }
