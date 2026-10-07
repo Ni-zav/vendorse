@@ -4,17 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaClient } from '@vendorse/database';
+import { PrismaService } from '../../database/prisma.service';
 import { hash } from 'bcrypt';
 import { UserRole, UserStatus } from '@vendorse/shared';
 
 @Injectable()
 export class UsersService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(params: {
     skip?: number;
