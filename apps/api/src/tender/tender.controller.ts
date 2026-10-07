@@ -31,7 +31,7 @@ export class TenderController {
       budget: number;
       deadline: Date | string;
     },
-  ) {
+  ): Promise<unknown> {
     return this.tenderService.createTender({
       ...createTenderDto,
       createdById: req.user.id,
@@ -40,7 +40,7 @@ export class TenderController {
 
   @Put(':id/publish')
   @Roles('ADMIN', 'BUYER')
-  async publishTender(@Request() req, @Param('id') id: string) {
+  async publishTender(@Request() req, @Param('id') id: string): Promise<unknown> {
     return this.tenderService.publishTender(id, {
       id: req.user.id,
       role: req.user.role,
@@ -56,7 +56,7 @@ export class TenderController {
     submitBidDto: {
       documents: Array<{ filePath: string; signatureHash: string }>;
     },
-  ) {
+  ): Promise<unknown> {
     return this.tenderService.submitBid({
       tenderId,
       submittedById: req.user.id,
@@ -76,7 +76,7 @@ export class TenderController {
       comments: string;
       recommendation: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION';
     },
-  ) {
+  ): Promise<unknown> {
     return this.tenderService.evaluateBid({
       bidId,
       reviewerId: req.user.id,
@@ -93,7 +93,7 @@ export class TenderController {
     @Request() req,
     @Param('id') tenderId: string,
     @Param('bidId') bidId: string,
-  ) {
+  ): Promise<unknown> {
     return this.tenderService.awardTender(
       tenderId,
       bidId,
@@ -107,12 +107,12 @@ export class TenderController {
 
   @Get('bids/vendor')
   @Roles('VENDOR')
-  async getVendorBids(@Request() req) {
+  async getVendorBids(@Request() req): Promise<unknown> {
     return this.tenderService.getVendorBids(req.user.id, req.user.orgId);
   }
 
   @Get(':id')
-  async getTender(@Request() req, @Param('id') id: string) {
+  async getTender(@Request() req, @Param('id') id: string): Promise<unknown> {
     return this.tenderService.getTenderById(id, {
       id: req.user.id,
       role: req.user.role,
@@ -127,7 +127,7 @@ export class TenderController {
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ) {
+  ): Promise<unknown> {
     const statusArray = status
       ? (Array.isArray(status) ? status : [status])
       : undefined;
