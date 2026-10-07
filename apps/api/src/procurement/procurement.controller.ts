@@ -30,25 +30,25 @@ export class ProcurementController {
   }
 
   @Get('work')
-  getMyWork(@Request() req: any) {
+  getMyWork(@Request() req: any): Promise<unknown> {
     return this.procurement.myWork(this.actor(req));
   }
 
   @Get('requests')
   @Roles('ADMIN', 'BUYER')
-  listRequests(@Request() req: any) {
+  listRequests(@Request() req: any): Promise<unknown> {
     return this.procurement.listRequests(this.actor(req));
   }
 
   @Post('requests')
   @Roles('ADMIN', 'BUYER')
-  createRequest(@Request() req: any, @Body() body: any) {
+  createRequest(@Request() req: any, @Body() body: any): Promise<unknown> {
     return this.procurement.createRequest(this.actor(req), body, this.ip(req));
   }
 
   @Post('requests/:id/submit')
   @Roles('ADMIN', 'BUYER')
-  submitRequest(@Request() req: any, @Param('id') id: string) {
+  submitRequest(@Request() req: any, @Param('id') id: string): Promise<unknown> {
     return this.procurement.submitRequest(this.actor(req), id, this.ip(req));
   }
 
@@ -58,7 +58,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { approved: boolean; reason?: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.decideRequest(
       this.actor(req),
       id,
@@ -74,29 +74,29 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { method: string; title?: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.createProject(this.actor(req), id, body, this.ip(req));
   }
 
   @Post('projects/:id/events')
   @Roles('ADMIN', 'BUYER')
-  createEvent(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+  createEvent(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
     return this.procurement.createEvent(this.actor(req), id, body, this.ip(req));
   }
 
   @Get('events')
-  listEvents(@Request() req: any) {
+  listEvents(@Request() req: any): Promise<unknown> {
     return this.procurement.listEvents(this.actor(req));
   }
 
   @Get('events/:id')
-  getEvent(@Request() req: any, @Param('id') id: string) {
+  getEvent(@Request() req: any, @Param('id') id: string): Promise<unknown> {
     return this.procurement.getEvent(this.actor(req), id);
   }
 
   @Post('events/:id/publish')
   @Roles('ADMIN', 'BUYER')
-  publishEvent(@Request() req: any, @Param('id') id: string) {
+  publishEvent(@Request() req: any, @Param('id') id: string): Promise<unknown> {
     return this.procurement.publishEvent(this.actor(req), id, this.ip(req));
   }
 
@@ -106,7 +106,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { supplierOrgId: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.inviteSupplier(
       this.actor(req),
       id,
@@ -121,7 +121,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { question: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.askClarification(
       this.actor(req),
       id,
@@ -136,7 +136,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { answer: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.answerClarification(
       this.actor(req),
       id,
@@ -147,13 +147,13 @@ export class ProcurementController {
 
   @Post('events/:id/amendments')
   @Roles('ADMIN', 'BUYER')
-  amendEvent(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+  amendEvent(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
     return this.procurement.amendEvent(this.actor(req), id, body, this.ip(req));
   }
 
   @Post('events/:id/responses')
   @Roles('VENDOR')
-  submitResponse(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+  submitResponse(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
     return this.procurement.submitResponse(this.actor(req), id, body, this.ip(req));
   }
 
@@ -163,7 +163,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { note?: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.openEvent(this.actor(req), id, body?.note, this.ip(req));
   }
 
@@ -173,7 +173,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { responseId: string; reviewerId: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.assignReviewer(
       this.actor(req),
       id,
@@ -189,7 +189,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { conflict: boolean; note?: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.declareConflict(this.actor(req), id, body, this.ip(req));
   }
 
@@ -199,7 +199,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: any,
-  ) {
+  ): Promise<unknown> {
     return this.procurement.submitScorecard(this.actor(req), id, body, this.ip(req));
   }
 
@@ -209,7 +209,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { responseId: string; rationale: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.recommendAward(
       this.actor(req),
       id,
@@ -225,7 +225,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { approved: boolean },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.approveAward(
       this.actor(req),
       id,
@@ -236,7 +236,7 @@ export class ProcurementController {
 
   @Post('awards/:id/contract')
   @Roles('ADMIN', 'BUYER')
-  createContract(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+  createContract(@Request() req: any, @Param('id') id: string, @Body() body: any): Promise<unknown> {
     return this.procurement.createContract(this.actor(req), id, body, this.ip(req));
   }
 
@@ -246,7 +246,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: { signedDocumentKey: string },
-  ) {
+  ): Promise<unknown> {
     return this.procurement.executeContract(
       this.actor(req),
       id,
@@ -257,13 +257,13 @@ export class ProcurementController {
 
   @Get('reviewers')
   @Roles('ADMIN', 'BUYER')
-  listReviewers() {
+  listReviewers(): Promise<unknown> {
     return this.procurement.listReviewers();
   }
 
   @Get('suppliers')
   @Roles('ADMIN', 'BUYER')
-  listSuppliers() {
+  listSuppliers(): Promise<unknown> {
     return this.procurement.listSuppliers();
   }
 
@@ -273,7 +273,7 @@ export class ProcurementController {
     @Request() req: any,
     @Param('id') id: string,
     @Body() body: any,
-  ) {
+  ): Promise<unknown> {
     return this.procurement.qualifySupplier(this.actor(req), id, body, this.ip(req));
   }
 }
