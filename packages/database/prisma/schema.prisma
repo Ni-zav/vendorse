@@ -74,6 +74,7 @@ model Organization {
   performanceReviews SupplierPerformanceReview[]
 
   @@index([supplierStatus])
+  @@unique([countryCode, registrationNumber])
   @@map("organizations")
 }
 
