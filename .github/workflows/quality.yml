@@ -42,10 +42,8 @@ jobs:
       - name: Validate Prisma schema
         run: pnpm --filter @vendorse/database exec prisma validate --schema prisma/schema.prisma
 
-      - name: Render baseline migration SQL
-        run: |
-          pnpm --filter @vendorse/database exec prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/vendorse-baseline.sql
-          cat /tmp/vendorse-baseline.sql
+      - name: Verify committed migration history
+        run: test -s packages/database/prisma/migrations/20261008000100_baseline/migration.sql
 
       - name: Build workspace
         run: pnpm build
