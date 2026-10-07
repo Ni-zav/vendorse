@@ -27,6 +27,9 @@ describe('AuthController', () => {
           name: 'Supplier Co',
           type: 'BUSINESS',
           address: 'Yogyakarta',
+          legalName: 'Supplier Company Indonesia',
+          registrationNumber: 'REG-001',
+          countryCode: 'ID',
         },
         user: {
           name: 'Vendor User',
@@ -46,6 +49,9 @@ describe('AuthController', () => {
           name: 'Supplier Co',
           type: 'BUSINESS',
           address: 'Yogyakarta',
+          legalName: 'Supplier Company Indonesia',
+          registrationNumber: 'REG-001',
+          countryCode: 'ID',
         },
       });
 
@@ -60,6 +66,9 @@ describe('AuthController', () => {
           name: 'Supplier Co',
           type: 'BUSINESS',
           address: 'Yogyakarta',
+          legalName: 'Supplier Company Indonesia',
+          registrationNumber: 'REG-001',
+          countryCode: 'ID',
         },
         user: {
           name: 'Vendor User',
