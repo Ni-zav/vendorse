@@ -363,6 +363,20 @@ export class ProcurementService {
     });
   }
 
+  async listReviewers() {
+    return this.prisma.user.findMany({
+      where: { role: 'REVIEWER', status: 'ACTIVE' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        orgId: true,
+        organization: { select: { name: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async listSuppliers() {
     return this.prisma.organization.findMany({
       where: { supplierStatus: { not: 'NOT_APPLICABLE' } },
