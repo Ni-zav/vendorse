@@ -68,15 +68,16 @@ export const ProcurementPolicy = {
     }
   },
 
-  requireInvitedSupplier(
+  requireInvitedSupplier<T extends { supplierOrgId: string }>(
     actor: ProcurementActor,
-    invitation: { supplierOrgId: string } | null,
-  ) {
+    invitation: T | null,
+  ): T {
     this.requireVendor(actor);
     if (!invitation || invitation.supplierOrgId !== actor.orgId) {
       throw new ForbiddenException(
         'Your organization was not invited to this event',
       );
     }
+    return invitation;
   },
 };
