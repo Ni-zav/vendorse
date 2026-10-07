@@ -5,7 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaClient, Prisma } from '@vendorse/database';
+import { Prisma } from '@vendorse/database';
+import { PrismaService } from '../database/prisma.service';
 import { TenderStatus } from '@vendorse/shared';
 
 type RequestUser = {
@@ -16,11 +17,7 @@ type RequestUser = {
 
 @Injectable()
 export class TenderService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async createTender(data: {
     title: string;
