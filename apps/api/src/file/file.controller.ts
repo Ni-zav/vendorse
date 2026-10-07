@@ -43,10 +43,14 @@ export class FileController {
 
   @Get(':id/download-url')
   async getDownloadUrl(@Param('id') id: string, @Request() req: any) {
-    return this.fileService.generateAuthorizedDownloadUrl(id, {
-      id: req.user.id,
-      role: req.user.role,
-      orgId: req.user.orgId,
-    });
+    return this.fileService.generateAuthorizedDownloadUrl(
+      id,
+      {
+        id: req.user.id,
+        role: req.user.role,
+        orgId: req.user.orgId,
+      },
+      req.ip || '127.0.0.1',
+    );
   }
 }
