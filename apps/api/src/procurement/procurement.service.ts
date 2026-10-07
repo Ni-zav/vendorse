@@ -588,7 +588,7 @@ export class ProcurementService {
             id: { in: documentIds },
             ownerId: actor.id,
             verificationStatus: 'VERIFIED',
-            responseDocument: null,
+            responseDocument: { is: null },
           },
         })
       : [];
