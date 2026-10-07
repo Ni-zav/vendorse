@@ -1,15 +1,11 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PrismaClient } from '@vendorse/database';
+import { PrismaService } from '../database/prisma.service';
 
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard)
 export class DashboardController {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = new PrismaClient();
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   @Get('stats')
   async getStats(@Request() req) {
