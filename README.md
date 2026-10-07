@@ -1,426 +1,233 @@
-# Vendorse - E-Procurement Platform
+# Vendorse
 
-## Overview
-A full-stack e-procurement system that manages the complete lifecycle of tenders, bids, and evaluations.
+Vendorse is an **e-procurement / competitive-sourcing workbench** that is being evolved into an auditable **Source-to-Contract + procurement-orchestration platform**.
 
-## Tech Stack
-- **Frontend**: Next.js 15.3 (React 19) with TypeScript 5.8
-- **Backend**: NestJS 11 with TypeScript 5.8
-- **Database**: PostgreSQL with Prisma 6.6 ORM
-- **Authentication**: JWT-based
-- **Package Manager**: pnpm 10.9 with Turborepo
+The current codebase is a strong prototype foundation, not yet a production-ready end-to-end procurement suite.
 
-## Requirements
-- Node.js 18.18+ or 20.9+
-- PostgreSQL 14+
-- pnpm 10.9+
+## Current direction
 
-## Project Structure
+The canonical product/technical plan is:
+
+- [2026-10-08 vision package](./docs/20261008/README.md)
+- [End-to-end product and technical vision](./docs/20261008/product-and-technical-vision.md)
+- [Delivery plan](./docs/20261008/delivery-plan.md)
+- [Market / standards / Indonesia research](./docs/20261008/research-notes.md)
+- [2026-10-04 audit and refactor](./docs/20261004/audit-and-refactor.md)
+
+The target product journey is:
+
+```text
+Procurement Request
+  -> Sourcing Project
+  -> Supplier Qualification
+  -> RFx / Tender
+  -> Clarifications + Amendments
+  -> Sealed Submission
+  -> Opening
+  -> Evaluation
+  -> Approval
+  -> Award
+  -> Contract
+  -> Supplier Performance / Renewal
+  -> ERP / P2P handoff
 ```
+
+Vendorse should own the upstream procurement decision process and integrate with downstream accounting/ERP/P2P systems rather than trying to replace them immediately.
+
+## Current implemented baseline
+
+The current `main` baseline includes:
+
+### Identity and administration
+
+- user roles for ADMIN / BUYER / VENDOR / REVIEWER;
+- organization membership;
+- JWT authentication;
+- admin user-management surfaces;
+- user account status;
+- partial audit logging.
+
+### Tender / sourcing workbench
+
+- create draft tender;
+- publish tender;
+- list/search/filter tenders;
+- attach tender documents;
+- responsive buyer/vendor/reviewer screens.
+
+### Supplier response
+
+- vendor proposal submission;
+- proposal documents;
+- organization-level duplicate active-bid guard;
+- deadline enforcement.
+
+### Evaluation
+
+- post-deadline reviewer access;
+- own-organization conflict guard;
+- score submission;
+- recommendation;
+- status transitions.
+
+### Award
+
+- buyer/admin award action;
+- active bids must have an evaluation;
+- selected bid requires at least one ACCEPT recommendation;
+- winning/losing bid status updates;
+- award audit event.
+
+### Platform
+
+- S3-compatible upload integration;
+- dashboard statistics;
+- in-app notification records;
+- pnpm/Turborepo monorepo;
+- GitHub Actions build + API unit tests.
+
+## Important limitations
+
+Do not infer production/legal compliance from the feature list above.
+
+The current baseline still needs, among other things:
+
+- committed database migrations;
+- fixed-point money + currency;
+- runtime request schemas;
+- production-grade browser sessions;
+- centralized resource authorization policies;
+- server-side file finalization/content verification;
+- resource-aware document downloads;
+- persisted/versioned evaluation criteria;
+- reviewer assignments;
+- conflict-of-interest declarations;
+- explicit bid opening;
+- immutable submission receipts/versions;
+- first-class scorecards;
+- first-class awards;
+- contracts;
+- procurement request/intake;
+- supplier lifecycle/qualification;
+- broader audit coverage;
+- browser E2E tests;
+- deployment/observability hardening.
+
+See [delivery-plan.md](./docs/20261008/delivery-plan.md) for the required order.
+
+## Tech stack
+
+- **Frontend:** Next.js 15.3 + React 19 + TypeScript
+- **Backend:** NestJS 11 + TypeScript
+- **Database:** PostgreSQL + Prisma
+- **Storage:** S3-compatible object storage
+- **Auth:** JWT-based current implementation
+- **Monorepo:** pnpm + Turborepo
+
+## Repository layout
+
+```text
 apps/
-├── api/                 # NestJS Backend API ([Documentation](/apps/api/README.md))
-│   ├── src/
-│   │   ├── auth/       # Authentication & Authorization
-│   │   ├── tender/     # Tender management
-│   │   ├── dashboard/  # Dashboard statistics
-│   │   └── file/       # File handling
-│   └── test/
-└── web/                # Next.js Frontend ([Documentation](/apps/web/README.md))
-    ├── src/
-    │   ├── app/        # Next.js 13+ App Router
-    │   ├── components/ # Shared components
-    │   └── contexts/   # React contexts
-    └── public/         # Static assets
+  api/                 NestJS API
+  web/                 Next.js web app
 
 packages/
-├── database/           # Prisma schema & migrations ([Documentation](/packages/database/README.md))
-├── shared/            # Shared types & utilities ([Documentation](/packages/shared/README.md))
-└── ui/                # Reusable UI components ([Documentation](/packages/ui/README.md))
+  database/            Prisma/database package
+  shared/              shared types/utilities
+  ui/                  reusable UI components
+
+docs/
+  20261004/            audit/refactor baseline
+  20261008/            canonical product + architecture vision
 ```
 
-## Core Features
+Repository-wide coding/domain rules are in [AGENTS.md](./AGENTS.md).
 
-### 1. User Management
-- **Roles & Permissions**:
-  - `ADMIN`: Full system access
-  - `BUYER`: Create/manage tenders
-  - `VENDOR`: Submit/manage bids
-  - `REVIEWER`: Evaluate bids
-- Organization-based access control
-- JWT authentication with role-based guards
+## Local development
 
-### 2. Tender Management
-- **Lifecycle States**:
-  ```
-  DRAFT → PUBLISHED → UNDER_REVIEW → AWARDED → COMPLETED
-  ```
-- Features:
-  - Create and publish tenders
-  - Attach supporting documents
-  - Set budgets and deadlines
-  - Search and filter functionality
+### Requirements
 
-### 3. Bid Management
-- **Bid Lifecycle**:
-  ```
-  SUBMITTED → UNDER_REVIEW → ACCEPTED/REJECTED
-  ```
-- Features:
-  - Submit bids with documents
-  - Document signature verification
-  - Bid status tracking
-  - Automatic notifications
+- Node.js 22 recommended for parity with CI;
+- PostgreSQL;
+- pnpm 10.9+.
 
-### 4. Evaluation System
-- Multi-reviewer evaluation process with weighted criteria:
-  - Technical Capability (40%): Technical approach and methodology
-  - Price (30%): Budget and cost-effectiveness evaluation
-  - Timeline (30%): Delivery schedule assessment
-- Evaluation Features:
-  - Score-based assessment (0-100 for each criterion)
-  - Detailed evaluation comments
-  - Three-way recommendation system:
-    - ACCEPT: Approve the bid
-    - REJECT: Decline the bid
-    - REQUEST_CLARIFICATION: Request additional information
-- Automated status updates:
-  - Updates bid status to UNDER_REVIEW on first evaluation
-  - Updates tender status based on evaluation progress
-  - Notification system for bid evaluations
+### Install
 
-### 5. Workflow Automation
-- **Status Management**:
-  - Automatic tender status progression
-  - Bid status synchronization
-  - Evaluation-triggered updates
-- **Notification System**:
-  - Status change notifications
-  - Evaluation notifications
-  - Award notifications
-- **Audit Logging**:
-  - User actions tracking
-  - IP address logging
-  - Complete activity timeline
-
-## User Management Guide
-
-### Creating New Users (PowerShell)
-
-1. **Create Buyer Account**:
-```powershell
-$headers = @{
-    'Content-Type' = 'application/json'
-}
-$buyerData = @{
-    organization = @{
-        name = "Organization Name"
-        type = "GOVERNMENT"
-        address = "Address"
-    }
-    user = @{
-        name = "Full Name"
-        email = "email@example.com"
-        password = "password"
-        role = "BUYER"
-    }
-}
-$jsonBody = $buyerData | ConvertTo-Json
-Invoke-WebRequest -Uri 'http://localhost:3003/auth/register' -Method Post -Headers $headers -Body $jsonBody
-```
-
-2. **Using Prisma Studio**:
-```bash
-cd packages/database
-pnpm prisma studio
-```
-Then:
-1. Create organization first
-2. Create user with reference to organization ID
-
-### Organization Types
-- `GOVERNMENT`
-- `BUSINESS`
-- `NON_PROFIT`
-
-## Database Schema
-
-### Core Models
-- `User`: User accounts and authentication
-- `Organization`: Company/entity information
-- `Tender`: Tender listings and details
-- `Bid`: Bid submissions and tracking
-- `BidDocument`: Bid supporting documents
-- `EvaluationScore`: Bid evaluations and scoring
-- `Notification`: System notifications
-- `AuditLog`: System audit trail
-
-## API Endpoints
-
-### Authentication
-- POST `/auth/register`: Register new user
-- POST `/auth/login`: User login
-- GET `/auth/profile`: Get user profile
-
-### Tenders
-- POST `/tenders`: Create tender
-- PUT `/tenders/:id/publish`: Publish tender
-- POST `/tenders/:id/bids`: Submit bid
-- POST `/tenders/bids/:id/evaluate`: Evaluate bid
-- PUT `/tenders/:id/award/:bidId`: Award tender
-
-### Other
-- GET `/dashboard/stats`: Dashboard statistics
-- GET `/files/upload-url`: Get file upload URL
-- GET `/files/:key/download-url`: Get file download URL
-
-## Security Features
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Organization-level data isolation
-- Document signature verification
-- API route protection
-- Audit logging
-
-## Security Implementation
-
-### Authentication & Authorization
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Organization-level data isolation
-- IP tracking for security audit
-
-### Document Security
-- Document signature verification
-- Hash-based integrity checking
-- Secure file storage and retrieval
-
-### API Security
-- Protected routes with JWT validation
-- Role-based endpoint guards
-- Rate limiting and request validation
-
-## Development Setup
-
-1. **Install Dependencies**:
 ```bash
 pnpm install
 ```
 
-2. **Environment Setup**:
-- Copy `.env.example` to `.env`
-- Configure database connection
+### Configure
 
-3. **Database Setup**:
+Copy the root environment example and provide required local values.
+
 ```bash
-cd packages/database
-pnpm prisma generate
-pnpm prisma db push
+cp .env.example .env
 ```
 
-4. **Start Development Servers**:
+Review the current app/package documentation for environment variables used by the API, database, and storage integration.
+
+### Database
+
+The current repository still uses the existing Prisma workflow.
+
+```bash
+pnpm --filter @vendorse/database db:generate
+```
+
+A committed migration history is a release blocker in the new delivery plan. Do not introduce new production schema evolution that relies only on `prisma db push`.
+
+### Development
+
 ```bash
 pnpm dev:all
 ```
 
-## Application Flows
+### Build
 
-### Tender Creation (BUYER)
-1. Create tender draft
-2. Add details and documents
-3. Publish tender
-4. Review submitted bids
-5. Award tender to winning bid
-
-### Bid Submission (VENDOR)
-1. View published tenders
-2. Prepare bid
-3. Upload required documents
-4. Submit bid
-5. Track bid status
-
-### Bid Evaluation (REVIEWER)
-1. Access assigned bids
-2. Score based on criteria
-3. Add comments
-4. Submit evaluation
-
-## API Documentation
-
-### Tender Management
-```typescript
-// Create Tender
-POST /tenders
-Body: {
-  title: string
-  description: string
-  budget: number
-  deadline: Date
-}
-
-// Publish Tender
-PUT /tenders/:id/publish
-
-// List Tenders
-GET /tenders
-Query: {
-  status?: TenderStatus[]
-  search?: string
-  page?: number
-  limit?: number
-}
+```bash
+pnpm build
 ```
 
-### Bid Management
-```typescript
-// Submit Bid
-POST /tenders/:id/bids
-Body: {
-  documents: Array<{
-    filePath: string
-    signatureHash: string
-  }>
-}
+### API tests
 
-// Evaluate Bid
-POST /tenders/bids/:id/evaluate
-Body: {
-  scores: Record<string, number>
-  comments: string
-  recommendation: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION'
-}
-
-// Award Tender
-PUT /tenders/:id/award/:bidId
+```bash
+pnpm --filter api test --runInBand
 ```
 
-## Data Models
+## Product boundary
 
-### Tender Status Flow
-```
-DRAFT → PUBLISHED → UNDER_REVIEW → AWARDED → COMPLETED
-```
+Vendorse is being designed for:
 
-### Bid Status Flow
-```
-SUBMITTED → UNDER_REVIEW → ACCEPTED/REJECTED
-```
+- procurement intake/orchestration;
+- supplier lifecycle;
+- sourcing / RFx;
+- sealed responses;
+- evaluation;
+- approval and award;
+- contract handoff/metadata;
+- audit and procurement analytics.
 
-### Evaluation Model
-```typescript
-interface Evaluation {
-  id: string
-  bidId: string
-  reviewerId: string
-  criteria: string
-  score: number
-  notes?: string
-  recommendation?: 'ACCEPT' | 'REJECT' | 'REQUEST_CLARIFICATION'
-  createdAt: Date
-  updatedAt: Date
-}
-```
+It is **not** currently intended to become a general ledger, payment engine, inventory system, or full ERP.
 
-## Development Guidelines
+## Indonesia / government procurement note
 
-### Environment Setup
+Vendorse should not be marketed as a replacement for Indonesian government procurement systems merely because it supports tenders.
 
-1. **Prerequisites Installation**:
-   ```bash
-   # Install Node.js LTS (18.18+ or 20.9+)
-   # Install PostgreSQL 14+
-   # Install pnpm
-   npm install -g pnpm@10.9
-   ```
+Government procurement currently uses official LKPP/INAPROC/SPSE/Katalog infrastructure and procedure-specific regulation. Any government-specific Vendorse capability must be separately scoped, researched, and implemented as jurisdiction-specific policy.
 
-2. **Environment Variables**:
-   ```bash
-   # Root directory
-   cp .env.example .env
-   
-   # API directory
-   cp apps/api/.env.example apps/api/.env
-   
-   # Web directory
-   cp apps/web/.env.example apps/web/.env
-   ```
+## Security note
 
-3. **Database Configuration**:
-   - Create a PostgreSQL database
-   - Update database connection string in:
-     - `packages/database/.env`
-     - `apps/api/.env`
+Vendorse contains commercially sensitive procurement data.
 
-4. **AWS Configuration** (for file storage):
-   - Create an S3 bucket
-   - Configure AWS credentials in `apps/api/.env`:
-     ```
-     AWS_ACCESS_KEY_ID=your_access_key
-     AWS_SECRET_ACCESS_KEY=your_secret_key
-     AWS_REGION=your_region
-     AWS_BUCKET_NAME=your_bucket_name
-     ```
+Security controls should be treated as product invariants, especially:
 
-5. **JWT Configuration**:
-   - Generate a secure secret key
-   - Add to `apps/api/.env`:
-     ```
-     JWT_SECRET=your_secure_secret
-     ```
+- tenant/organization isolation;
+- proposal confidentiality;
+- controlled opening;
+- evaluator assignment/conflicts;
+- file authorization;
+- auditability;
+- immutable submitted records.
 
-### Testing Strategy
-1. **Unit Tests**:
-   - Controller tests
-   - Service logic tests
-   - Component tests
-2. **Integration Tests**:
-   - API endpoint tests
-   - Database interaction tests
-3. **E2E Tests**:
-   - Complete workflow tests
-   - User journey tests
-
-### Deployment
-1. **Prerequisites**:
-   - Node.js 18+
-   - PostgreSQL 14+
-   - pnpm package manager
-2. **Build Process**:
-   ```bash
-   pnpm build
-   ```
-3. **Production Start**:
-   ```bash
-   pnpm start:prod
-   ```
-
-## Error Handling
-
-### API Error Responses
-```typescript
-{
-  error: string
-  message: string
-  statusCode: number
-}
-```
-
-### Common Error Types
-- Authentication errors (401)
-- Authorization errors (403)
-- Validation errors (400)
-- Not found errors (404)
-- Server errors (500)
-
-## Monitoring & Logging
-
-### Audit Trail
-- User actions
-- System events
-- Security events
-- Error tracking
-
-### Performance Metrics
-- API response times
-- Database query performance
-- File operation metrics
-- Authentication metrics
+Do not advertise certifications, legal compliance, cryptographic signatures, or other controls unless they are actually implemented and verified.
