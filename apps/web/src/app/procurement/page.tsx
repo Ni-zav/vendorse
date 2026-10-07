@@ -24,6 +24,7 @@ export default function ProcurementWorkspacePage() {
   const [events, setEvents] = useState<AnyRecord[]>([]);
   const [requests, setRequests] = useState<AnyRecord[]>([]);
   const [suppliers, setSuppliers] = useState<AnyRecord[]>([]);
+  const [analytics, setAnalytics] = useState<AnyRecord | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -38,6 +39,7 @@ export default function ProcurementWorkspacePage() {
       if (user.role === 'BUYER' || user.role === 'ADMIN') {
         calls.push(fetch('/api/procurement/requests', { cache: 'no-store' }));
         calls.push(fetch('/api/procurement/suppliers', { cache: 'no-store' }));
+        calls.push(fetch('/api/procurement/analytics', { cache: 'no-store' }));
       }
       const responses = await Promise.all(calls);
       for (const response of responses) {
@@ -50,6 +52,7 @@ export default function ProcurementWorkspacePage() {
       setEvents(await responses[1].json());
       if (responses[2]) setRequests(await responses[2].json());
       if (responses[3]) setSuppliers(await responses[3].json());
+      if (responses[4]) setAnalytics(await responses[4].json());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Workspace could not be loaded');
     }
@@ -121,6 +124,34 @@ export default function ProcurementWorkspacePage() {
 
         {error && (
           <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        )}
+
+
+        {(user?.role === 'BUYER' || user?.role === 'ADMIN') && analytics && (
+          <section className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Supplier response rate</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">
+                {analytics.supplierResponseRate == null ? '—' : Math.round(analytics.supplierResponseRate * 100) + '%'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Evaluation completion</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">
+                {analytics.evaluationCompletionRate == null ? '—' : Math.round(analytics.evaluationCompletionRate * 100) + '%'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Request → contract</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">
+                {analytics.averageRequestToContractDays == null ? '—' : analytics.averageRequestToContractDays.toFixed(1) + 'd'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Contracts expiring ≤90d</p>
+              <p className="mt-2 text-2xl font-black text-slate-950">{analytics.expiringContracts?.length || 0}</p>
+            </div>
+          </section>
         )}
 
         {user?.role === 'ADMIN' && (
