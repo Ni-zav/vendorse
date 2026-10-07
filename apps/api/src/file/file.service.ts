@@ -189,7 +189,11 @@ export class FileService {
     }
   }
 
-  async generateAuthorizedDownloadUrl(fileId: string, actor: Actor) {
+  async generateAuthorizedDownloadUrl(
+    fileId: string,
+    actor: Actor,
+    ipAddress = '127.0.0.1',
+  ) {
     const file = await this.prisma.fileObject.findUnique({
       where: { id: fileId },
       include: {
@@ -243,6 +247,16 @@ export class FileService {
     if (!allowed) {
       throw new ForbiddenException('You are not authorized to download this document');
     }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: actor.id,
+        actionType: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        targetId: file.id,
+        targetType: 'FILE_OBJECT',
+        ipAddress,
+      },
+    });
 
     const url = await getSignedUrl(
       this.s3Client,
