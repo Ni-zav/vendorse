@@ -64,7 +64,7 @@ export default function RegisterPage() {
       }
 
       localStorage.setItem('token', 'cookie-session');
-      router.push('/dashboard');
+      router.push('/procurement');
     } catch (registrationError) {
       setError(
         registrationError instanceof Error
