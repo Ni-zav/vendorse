@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 export async function POST(req: NextRequest) {
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:3003';
-    const authHeader = req.headers.get('authorization');
+    const sessionToken = req.cookies.get('vendorse_session')?.value;
+    const authHeader = sessionToken ? 'Bearer ' + sessionToken : req.headers.get('authorization');
 
     if (!authHeader) {
       return Response.json(
