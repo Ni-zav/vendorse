@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import {
   arrayField,
   asObject,
@@ -247,7 +248,7 @@ export function parseResponse(body: unknown) {
     max: 25,
   }).map((entry, index) => {
     if (typeof entry !== 'string' || !entry.trim() || entry.length > 120) {
-      throw new Error('documentIds[' + index + '] must be a valid identifier');
+      throw new BadRequestException('documentIds[' + index + '] must be a valid identifier');
     }
     return entry.trim();
   });
