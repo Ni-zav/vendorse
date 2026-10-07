@@ -22,7 +22,12 @@ This folder is the canonical planning package for the next Vendorse development 
    - release gates;
    - explicit non-priorities.
 
-3. [Research notes](./research-notes.md)
+3. [Implementation status](./implementation-status.md)
+   - what the end-to-end branch now implements;
+   - release-gate reconciliation;
+   - deliberately deferred platform maturity work.
+
+4. [Research notes](./research-notes.md)
    - current procurement-suite patterns;
    - OCDS;
    - Peppol;
