@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, FormField, Input, TextArea } from '@vendorse/ui';
-import { ProtectedRoute } from '../../../../components/ProtectedRoute';
+import { ProtectedRoute } from '../../../../../components/ProtectedRoute';
 
 type Criterion = { key: string; name: string; weight: number };
 type LineItem = { code: string; description: string; quantity: number; unit: string };
