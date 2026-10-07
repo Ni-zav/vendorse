@@ -8,12 +8,10 @@ import {
 import { Prisma } from '@vendorse/database';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
-
-type Actor = {
-  id: string;
-  role: string;
-  orgId: string;
-};
+import {
+  ProcurementActor as Actor,
+  ProcurementPolicy,
+} from './procurement.policy';
 
 type CriterionInput = {
   key: string;
@@ -50,12 +48,6 @@ export class ProcurementService {
       throw new BadRequestException('currency must be a 3-letter ISO 4217 code');
     }
     return normalized;
-  }
-
-  private assertWorkspace(actor: Actor, workspaceOrgId: string) {
-    if (actor.role !== 'ADMIN' && actor.orgId !== workspaceOrgId) {
-      throw new ForbiddenException('This record belongs to another procurement workspace');
-    }
   }
 
   private async audit(
@@ -225,9 +217,7 @@ export class ProcurementService {
     reason: string,
     ipAddress: string,
   ) {
-    if (actor.role !== 'ADMIN') {
-      throw new ForbiddenException('Administrator approval is required');
-    }
+    ProcurementPolicy.requireAdmin(actor);
     const request = await this.prisma.procurementRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Procurement request not found');
     if (request.status !== 'SUBMITTED') {
@@ -268,10 +258,8 @@ export class ProcurementService {
       include: { project: true },
     });
     if (!request) throw new NotFoundException('Procurement request not found');
-    this.assertWorkspace(actor, request.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) {
-      throw new ForbiddenException('Only procurement users can source an approved request');
-    }
+    ProcurementPolicy.requireWorkspace(actor, request.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (request.status !== 'APPROVED') {
       throw new ConflictException('Request must be approved before sourcing begins');
     }
@@ -319,12 +307,10 @@ export class ProcurementService {
     },
     ipAddress: string,
   ) {
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) {
-      throw new ForbiddenException('Only procurement users can create sourcing events');
-    }
+    ProcurementPolicy.requireProcurement(actor);
     const project = await this.prisma.sourcingProject.findUnique({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Sourcing project not found');
-    this.assertWorkspace(actor, project.workspaceOrgId);
+    ProcurementPolicy.requireWorkspace(actor, project.workspaceOrgId);
 
     const eventTypes = ['RFI', 'RFQ', 'RFP', 'TENDER', 'BAFO'];
     if (!eventTypes.includes(data.type)) throw new BadRequestException('Invalid event type');
@@ -415,8 +401,8 @@ export class ProcurementService {
       include: { project: true, criteria: true, lineItems: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (event.status !== 'DRAFT') throw new ConflictException('Only draft events can be published');
     if (event.closeAt <= new Date()) throw new ConflictException('Event close time has passed');
     const totalWeight = event.criteria.reduce((sum, c) => sum + Number(c.weight), 0);
@@ -478,7 +464,7 @@ export class ProcurementService {
     data: { status: string; scopeCategory?: string; notes?: string; expiresAt?: string | Date },
     ipAddress: string,
   ) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Administrator access required');
+    ProcurementPolicy.requireAdmin(actor);
     const allowed = ['PENDING', 'QUALIFIED', 'CONDITIONALLY_QUALIFIED', 'REJECTED', 'EXPIRED'];
     if (!allowed.includes(data.status)) throw new BadRequestException('Invalid qualification status');
     const supplier = await this.prisma.organization.findUnique({ where: { id: supplierOrgId } });
@@ -524,8 +510,8 @@ export class ProcurementService {
       include: { project: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (!['DRAFT', 'PUBLISHED'].includes(event.status)) {
       throw new ConflictException('Suppliers can only be invited before the event closes');
     }
@@ -545,7 +531,7 @@ export class ProcurementService {
   }
 
   async askClarification(actor: Actor, eventId: string, question: string, ipAddress: string) {
-    if (actor.role !== 'VENDOR') throw new ForbiddenException('Supplier access required');
+    ProcurementPolicy.requireVendor(actor);
     const event = await this.prisma.sourcingEvent.findUnique({ where: { id: eventId } });
     if (!event || event.status !== 'PUBLISHED' || event.closeAt <= new Date()) {
       throw new ConflictException('Clarifications are closed for this event');
@@ -565,13 +551,13 @@ export class ProcurementService {
   }
 
   async answerClarification(actor: Actor, clarificationId: string, answer: string, ipAddress: string) {
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireProcurement(actor);
     const clarification = await this.prisma.clarification.findUnique({
       where: { id: clarificationId },
       include: { event: { include: { project: true } } },
     });
     if (!clarification) throw new NotFoundException('Clarification not found');
-    this.assertWorkspace(actor, clarification.event.project.workspaceOrgId);
+    ProcurementPolicy.requireWorkspace(actor, clarification.event.project.workspaceOrgId);
     if (!answer?.trim()) throw new BadRequestException('answer is required');
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.clarification.update({
@@ -594,8 +580,8 @@ export class ProcurementService {
       include: { project: true, criteria: true, lineItems: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (event.status !== 'PUBLISHED') throw new ConflictException('Only published events can be amended');
     if (!data.summary?.trim()) throw new BadRequestException('summary is required');
     const closeAt = data.closeAt ? new Date(data.closeAt) : event.closeAt;
@@ -637,7 +623,7 @@ export class ProcurementService {
     },
     ipAddress: string,
   ) {
-    if (actor.role !== 'VENDOR') throw new ForbiddenException('Supplier access required');
+    ProcurementPolicy.requireVendor(actor);
     const event = await this.prisma.sourcingEvent.findUnique({
       where: { id: eventId },
       include: { lineItems: true },
@@ -756,8 +742,8 @@ export class ProcurementService {
       include: { project: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (event.status !== 'PUBLISHED') throw new ConflictException('Only published events can be opened');
     if (event.closeAt > new Date()) throw new ConflictException('Event cannot be opened before the submission deadline');
 
@@ -784,8 +770,8 @@ export class ProcurementService {
       include: { project: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
 
     const [response, reviewer] = await Promise.all([
       this.prisma.sourcingResponse.findUnique({ where: { id: responseId } }),
@@ -941,8 +927,8 @@ export class ProcurementService {
       include: { project: true, award: true },
     });
     if (!event) throw new NotFoundException('Sourcing event not found');
-    this.assertWorkspace(actor, event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (!['OPENED', 'EVALUATING'].includes(event.status)) throw new ConflictException('Event is not ready for award recommendation');
     if (event.award) throw new ConflictException('An award already exists for this event');
     if (!rationale?.trim()) throw new BadRequestException('Award rationale is required');
@@ -992,7 +978,7 @@ export class ProcurementService {
   }
 
   async approveAward(actor: Actor, awardId: string, approved: boolean, ipAddress: string) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException('Administrator approval is required');
+    ProcurementPolicy.requireAdmin(actor);
     const award = await this.prisma.award.findUnique({ where: { id: awardId } });
     if (!award) throw new NotFoundException('Award not found');
     if (award.status !== 'PENDING_APPROVAL') throw new ConflictException('Award has already been decided');
@@ -1028,8 +1014,8 @@ export class ProcurementService {
       include: { event: { include: { project: true } }, contract: true },
     });
     if (!award) throw new NotFoundException('Award not found');
-    this.assertWorkspace(actor, award.event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, award.event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (award.status !== 'APPROVED') throw new ConflictException('Award must be approved before contract creation');
     if (award.contract) throw new ConflictException('Contract already exists for this award');
     const startDate = new Date(data.startDate);
@@ -1069,8 +1055,8 @@ export class ProcurementService {
       include: { award: { include: { event: { include: { project: true } } } } },
     });
     if (!contract) throw new NotFoundException('Contract not found');
-    this.assertWorkspace(actor, contract.award.event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, contract.award.event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
     if (!signedDocumentKey?.trim()) throw new BadRequestException('signedDocumentKey is required');
     if (['EXECUTED', 'ACTIVE', 'EXPIRED', 'TERMINATED'].includes(contract.status)) {
       throw new ConflictException('Contract is not executable from its current state');
@@ -1165,7 +1151,7 @@ export class ProcurementService {
     if (!event) throw new NotFoundException('Sourcing event not found');
 
     if (actor.role === 'BUYER') {
-      this.assertWorkspace(actor, event.project.workspaceOrgId);
+      ProcurementPolicy.requireWorkspace(actor, event.project.workspaceOrgId);
     }
     if (actor.role === 'VENDOR') {
       const invited = event.invitations.some((i) => i.supplierOrgId === actor.orgId);
@@ -1240,8 +1226,8 @@ export class ProcurementService {
       include: { award: { include: { event: { include: { project: true } } } } },
     });
     if (!contract) throw new NotFoundException('Contract not found');
-    this.assertWorkspace(actor, contract.award.event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, contract.award.event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
 
     const periodStart = new Date(data.periodStart);
     const periodEnd = new Date(data.periodEnd);
@@ -1282,7 +1268,7 @@ export class ProcurementService {
   }
 
   async getSupplierProfile(actor: Actor, supplierOrgId: string) {
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireProcurement(actor);
     const supplier = await this.prisma.organization.findUnique({
       where: { id: supplierOrgId },
       include: {
@@ -1318,7 +1304,7 @@ export class ProcurementService {
   }
 
   async analytics(actor: Actor) {
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireProcurement(actor);
     const workspace = actor.role === 'ADMIN' ? undefined : actor.orgId;
     const requestWhere = workspace ? { workspaceOrgId: workspace } : {};
     const eventWhere = workspace ? { project: { workspaceOrgId: workspace } } : {};
@@ -1450,8 +1436,8 @@ export class ProcurementService {
       },
     });
     if (!contract) throw new NotFoundException('Contract not found');
-    this.assertWorkspace(actor, contract.award.event.project.workspaceOrgId);
-    if (!['BUYER', 'ADMIN'].includes(actor.role)) throw new ForbiddenException();
+    ProcurementPolicy.requireWorkspace(actor, contract.award.event.project.workspaceOrgId);
+    ProcurementPolicy.requireProcurement(actor);
 
     return {
       schemaVersion: 'vendorse.contract-handoff.v1',
@@ -1495,7 +1481,7 @@ export class ProcurementService {
   }
 
   async listOutbox(actor: Actor) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException();
+    ProcurementPolicy.requireAdmin(actor);
     return this.prisma.outboxEvent.findMany({
       where: { status: { in: ['PENDING', 'FAILED'] } },
       orderBy: { createdAt: 'asc' },
