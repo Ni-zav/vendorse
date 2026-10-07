@@ -1,6 +1,5 @@
 'use client';
 
-import { Fragment } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
@@ -151,7 +150,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <ChevronDownIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
                     </Menu.Button>
                     <Transition
-                      as={Fragment}
                       enter="transition ease-out duration-100"
                       enterFrom="transform opacity-0 scale-95"
                       enterTo="transform opacity-100 scale-100"
