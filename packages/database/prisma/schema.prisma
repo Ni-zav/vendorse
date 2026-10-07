@@ -389,7 +389,7 @@ model FileObject {
   originalFileName String
   contentType     String
   sizeBytes       Int
-  sha256          String
+  sha256          String?
   verificationStatus FileVerificationStatus @default(PENDING)
   createdAt       DateTime @default(now())
   verifiedAt      DateTime?
