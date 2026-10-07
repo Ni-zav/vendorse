@@ -24,6 +24,11 @@ export default function RegisterPage() {
           | 'GOVERNMENT'
           | 'NON_PROFIT',
         address: String(formData.get('address') || '').trim(),
+        legalName: String(formData.get('legalName') || '').trim(),
+        registrationNumber: String(formData.get('registrationNumber') || '').trim(),
+        countryCode: String(formData.get('countryCode') || '').trim().toUpperCase(),
+        taxId: String(formData.get('taxId') || '').trim() || undefined,
+        domain: String(formData.get('domain') || '').trim() || undefined,
       };
       const user = {
         name: String(formData.get('name') || '').trim(),
@@ -31,8 +36,15 @@ export default function RegisterPage() {
         password: String(formData.get('password') || ''),
       };
 
-      if (!organization.name || !organization.type || !organization.address) {
-        throw new Error('Complete all organization fields.');
+      if (
+        !organization.name ||
+        !organization.type ||
+        !organization.address ||
+        !organization.legalName ||
+        !organization.registrationNumber ||
+        !organization.countryCode
+      ) {
+        throw new Error('Complete all required organization identity fields.');
       }
 
       if (!user.name || !user.email || !user.password) {
@@ -186,6 +198,42 @@ export default function RegisterPage() {
                       autoComplete="street-address"
                       placeholder="City / registered address"
                     />
+                  </FormField>
+                  <FormField label="Legal entity name" required className="sm:col-span-2">
+                    <Input
+                      type="text"
+                      name="legalName"
+                      required
+                      placeholder="Name exactly as registered"
+                    />
+                  </FormField>
+
+                  <FormField label="Registration number" required>
+                    <Input
+                      type="text"
+                      name="registrationNumber"
+                      required
+                      placeholder="Business / entity registration"
+                    />
+                  </FormField>
+
+                  <FormField label="Country code" hint="ISO 3166-1 alpha-2" required>
+                    <Input
+                      type="text"
+                      name="countryCode"
+                      required
+                      maxLength={2}
+                      defaultValue="ID"
+                      placeholder="ID"
+                    />
+                  </FormField>
+
+                  <FormField label="Tax identifier">
+                    <Input type="text" name="taxId" placeholder="Optional tax ID / NPWP" />
+                  </FormField>
+
+                  <FormField label="Company domain">
+                    <Input type="text" name="domain" placeholder="example.com" />
                   </FormField>
                 </div>
               </fieldset>
