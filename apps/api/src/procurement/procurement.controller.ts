@@ -255,6 +255,12 @@ export class ProcurementController {
     );
   }
 
+  @Get('reviewers')
+  @Roles('ADMIN', 'BUYER')
+  listReviewers() {
+    return this.procurement.listReviewers();
+  }
+
   @Get('suppliers')
   @Roles('ADMIN', 'BUYER')
   listSuppliers() {
