@@ -4,17 +4,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaClient } from '@vendorse/database';
+import { PrismaService } from '../database/prisma.service';
 import { OrgType } from '@vendorse/shared';
 import { compare, hash } from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  private prisma: PrismaClient;
-
-  constructor(private jwtService: JwtService) {
-    this.prisma = new PrismaClient();
-  }
+  constructor(
+    private jwtService: JwtService,
+    private prisma: PrismaService,
+  ) {}
 
   async validateUser(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -77,6 +76,7 @@ export class AuthService {
           name: data.organization.name.trim(),
           type: data.organization.type,
           address: data.organization.address.trim(),
+          supplierStatus: 'PENDING_REVIEW',
         },
       });
 
